@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Replay — Médias géolocalisés</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='11' fill='%232563eb'/%3E%3Cpath d='M9 7l8 5-8 5z' fill='white'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+  <!-- Carte plein écran -->
+  <div id="map"></div>
+
+  <!-- Timeline (haut, centrée) -->
+  <section id="timeline" class="glass" aria-label="Timeline">
+    <div class="tl-head">
+      <span id="tl-title" class="tl-title">Aucun média chargé</span>
+      <div class="tl-zoom">
+        <button class="icon-btn sm" id="tl-zoom-out" title="Dézoomer (−)">−</button>
+        <button class="icon-btn sm" id="tl-fit" title="Toute la période (double-clic)">⤢</button>
+        <button class="icon-btn sm" id="tl-zoom-in" title="Zoomer (+)">+</button>
+      </div>
+    </div>
+    <canvas id="tl-canvas"></canvas>
+    <canvas id="tl-overview"></canvas>
+    <div id="tl-tip" class="tip" hidden></div>
+  </section>
+
+  <!-- Outils carte (gauche) -->
+  <nav id="map-tools" class="glass vertical">
+    <button class="icon-btn" id="btn-folder" title="Ouvrir un dossier de médias">
+      <svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+    </button>
+    <button class="icon-btn" id="btn-fit" title="Tout voir sur la carte">
+      <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+    </button>
+    <button class="icon-btn toggle" id="btn-follow" title="Suivre les médias actifs">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>
+    </button>
+    <div class="sep"></div>
+    <div class="basemap-wrap">
+      <button class="icon-btn" id="btn-basemap" title="Fond de carte">
+        <svg viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>
+      </button>
+      <div id="basemap-menu" class="menu glass" hidden></div>
+    </div>
+    <span id="net-dot" class="net-dot" title="Connexion"></span>
+    <div class="sep"></div>
+    <button class="icon-btn" id="btn-drawer" title="Médias et métadonnées">
+      <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+      <span id="badge-missing" class="badge" hidden>0</span>
+    </button>
+  </nav>
+
+  <!-- Fenêtres médias -->
+  <div id="dock"></div>
+  <div id="floating"></div>
+
+  <!-- Playbar (bas) -->
+  <footer id="playbar" class="glass">
+    <div class="pb-time">
+      <div id="pb-clock" class="pb-clock">--:--:--</div>
+      <div id="pb-date" class="pb-date">—</div>
+    </div>
+    <div class="pb-controls">
+      <button class="icon-btn" id="pb-prev" title="Évènement précédent (Maj+←)">
+        <svg viewBox="0 0 24 24"><path d="M6 5v14M18 6l-9 6 9 6z" class="fill"/></svg>
+      </button>
+      <button class="icon-btn" id="pb-back" title="−10 s (←)">
+        <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.3-5.6M4 4v4h4"/><text x="12" y="15.5" text-anchor="middle" font-size="7" class="txt">10</text></svg>
+      </button>
+      <button class="icon-btn play" id="pb-play" title="Lecture / pause (Espace)">
+        <svg viewBox="0 0 24 24" class="i-play"><path d="M8 5l11 7-11 7z" class="fill"/></svg>
+        <svg viewBox="0 0 24 24" class="i-pause"><path d="M7 5h3v14H7zM14 5h3v14h-3z" class="fill"/></svg>
+      </button>
+      <button class="icon-btn" id="pb-fwd" title="+10 s (→)">
+        <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4h-4"/><text x="12" y="15.5" text-anchor="middle" font-size="7" class="txt">10</text></svg>
+      </button>
+      <button class="icon-btn" id="pb-next" title="Évènement suivant (Maj+→)">
+        <svg viewBox="0 0 24 24"><path d="M18 5v14M6 6l9 6-9 6z" class="fill"/></svg>
+      </button>
+    </div>
+    <div class="pb-progress">
+      <input type="range" id="pb-seek" min="0" max="1000" value="0" step="1" aria-label="Position">
+    </div>
+    <div class="pb-right">
+      <select id="pb-speed" title="Vitesse de lecture">
+        <option value="0.25">0.25×</option>
+        <option value="0.5">0.5×</option>
+        <option value="1" selected>1×</option>
+        <option value="2">2×</option>
+        <option value="4">4×</option>
+        <option value="8">8×</option>
+        <option value="16">16×</option>
+      </select>
+      <button class="icon-btn toggle" id="pb-loop" title="Boucle">
+        <svg viewBox="0 0 24 24"><path d="M17 2l3 3-3 3"/><path d="M4 11V9a4 4 0 0 1 4-4h12M7 22l-3-3 3-3"/><path d="M20 13v2a4 4 0 0 1-4 4H4"/></svg>
+      </button>
+      <button class="icon-btn" id="pb-mute" title="Son">
+        <svg viewBox="0 0 24 24" class="i-vol"><path d="M4 9h4l5-4v14l-5-4H4z" class="fill"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg>
+        <svg viewBox="0 0 24 24" class="i-mute"><path d="M4 9h4l5-4v14l-5-4H4z" class="fill"/><path d="M17 9l5 6M22 9l-5 6"/></svg>
+      </button>
+    </div>
+  </footer>
+
+  <!-- Tiroir médias / éditeur -->
+  <aside id="drawer" aria-label="Médias">
+    <header class="dr-head">
+      <h2>Médias</h2>
+      <button class="icon-btn sm" id="dr-close" title="Fermer">✕</button>
+    </header>
+    <div class="dr-status">
+      <span id="dr-folder">—</span>
+      <span id="dr-save" class="save-state"></span>
+    </div>
+    <div class="dr-actions">
+      <div class="seg" id="dr-filter">
+        <button data-f="all" class="on">Tous</button>
+        <button data-f="missing">Incomplets</button>
+      </div>
+      <button class="btn sm" id="dr-import" title="Importer une trace GPX ou un fichier JSON">Importer…</button>
+      <button class="btn sm" id="dr-export" title="Télécharger replay.json">Exporter</button>
+    </div>
+    <ul id="dr-list" class="dr-list"></ul>
+    <div id="dr-editor" class="dr-editor" hidden></div>
+  </aside>
+
+  <!-- Accueil -->
+  <div id="welcome">
+    <div class="wl-card glass">
+      <div class="wl-logo">
+        <svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" class="c"/><path d="M19 15l14 9-14 9z" fill="#fff"/></svg>
+      </div>
+      <h1>Replay</h1>
+      <p class="muted">Rejouez vos vidéos et photos géolocalisées, synchronisées sur une timeline et une carte.</p>
+      <button class="btn primary lg" id="wl-open">Choisir le dossier de médias…</button>
+      <button class="btn lg" id="wl-reopen" hidden></button>
+      <label class="btn lg" id="wl-fallback-label" hidden>
+        Choisir le dossier (mode lecture seule)
+        <input type="file" id="wl-fallback" webkitdirectory directory multiple hidden>
+      </label>
+      <label class="link">
+        ou ouvrir uniquement un fichier JSON
+        <input type="file" id="wl-json" accept=".json,application/json" hidden>
+      </label>
+      <p class="hint muted" id="wl-hint">Astuce : le dossier <code>medias/</code> à côté de cette page contient une démonstration.</p>
+    </div>
+  </div>
+
+  <input type="file" id="import-input" accept=".gpx,.json" multiple hidden>
+  <div id="lightbox" hidden><img alt=""></div>
+  <div id="toast" role="status"></div>
+
+  <!-- Librairies embarquées (aucune dépendance réseau) -->
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="vendor/exifr/lite.umd.js"></script>
+  <script src="vendor/topojson/topojson-client.min.js"></script>
+  <script src="vendor/world/countries-50m.js"></script>
+  <script src="tiles/config.js"></script>
+
+  <script src="js/util.js"></script>
+  <script src="js/model.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/metadata.js"></script>
+  <script src="js/basemap.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/timeline.js"></script>
+  <script src="js/player.js"></script>
+  <script src="js/panels.js"></script>
+  <script src="js/editor.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

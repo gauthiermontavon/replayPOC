@@ -1,0 +1,40 @@
+[{
+  "id": "vehicle-001",
+  "type": "moving-object",
+  "name": "Véhicule A",
+  "track": [
+    {
+      "time": "2026-08-24T14:30:00Z",
+      "lat": 47.123,
+      "lon": 7.456
+    },
+    {
+      "time": "2026-08-24T14:30:10Z",
+      "lat": 47.124,
+      "lon": 7.458
+    }
+  ]
+}
+,
+{
+  "id": "camera-01",
+  "type": "video",
+  "name": "Caméra 01",
+  "position": {
+    "lat": 47.123,
+    "lon": 7.456
+  },
+  "start": "2026-08-24T14:30:00Z",
+  "file": "camera-01.mp4"
+},
+{
+  "id": "photo-17",
+  "type": "image",
+  "time": "2026-08-24T14:32:14Z",
+  "position": {
+    "lat": 47.125,
+    "lon": 7.461
+  },
+  "file": "photo-17.jpg"
+}
+]
