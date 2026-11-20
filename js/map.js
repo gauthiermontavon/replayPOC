@@ -23,11 +23,12 @@
     map.on('dragstart', () => { if (V.follow) V.setFollow(false); });
   };
 
-  function iconFor(it) {
-    const head = it.type === 'moving-object' ? '<div class="heading"></div>' : '';
+  function iconFor(type, label, count) {
+    const head = type === 'moving-object' ? '<div class="heading"></div>' : '';
+    const badge = count > 1 ? '<span class="rp-count">' + count + '</span>' : '';
     return L.divIcon({
-      className: 'rp-marker ' + it.type + ' inactive',
-      html: head + '<div class="rp-pin">' + U.icons[it.type] + '</div><div class="rp-label">' + U.esc(it.name) + '</div>',
+      className: 'rp-marker ' + type + ' inactive',
+      html: head + '<div class="rp-pin">' + U.icons[type] + badge + '</div><div class="rp-label">' + U.esc(label) + '</div>',
       iconSize: [34, 34], iconAnchor: [17, 17]
     });
   }
@@ -41,21 +42,28 @@
   V.build = function () {
     marks.forEach(m => { m.marker.remove(); m.full && m.full.remove(); m.done && m.done.remove(); });
     marks.clear();
-    M.items.forEach(addItem);
+    M.roots.forEach(addNode);
     if (RP.player) V.update(RP.player.t, RP.player.activeIds);
   };
 
-  function addItem(it) {
+  /*
+   * Repères : clé -> { marker, ids:Set (éléments jouables représentés), node (item ou caméra), videos? }
+   *  - image / objet mobile : un repère, clé = id
+   *  - caméra : vidéos groupées par position effective ; 1 groupe → clé = id caméra, sinon 1 repère par groupe
+   */
+  function addNode(node) {
+    if (node.type === 'camera') return addCamera(node);
+    const it = node;
     const pos = it.type === 'moving-object' ? (it.track && it.track[0]) : it.pos;
     if (!pos) return;
-    const m = { state: '' };
+    const m = { state: '', ids: new Set([it.id]), node: it };
     if (it.type === 'moving-object' && it.track.length > 1) {
       const ll = it.track.map(p => [p.lat, p.lon]);
       const c = cssColor(it.type);
       m.full = L.polyline(ll, { color: c, weight: 3, opacity: 0.35, dashArray: '6 6', interactive: false }).addTo(V.map);
       m.done = L.polyline([], { color: c, weight: 4, opacity: 0.9, interactive: false }).addTo(V.map);
     }
-    m.marker = L.marker([pos.lat, pos.lon], { icon: iconFor(it), title: it.name, keyboard: false, riseOnHover: true }).addTo(V.map);
+    m.marker = L.marker([pos.lat, pos.lon], { icon: iconFor(it.type, it.name), title: it.name, keyboard: false, riseOnHover: true }).addTo(V.map);
     m.marker.on('click', () => RP.bus.emit('item:click', it.id));
     m.marker.on('dragend', () => {
       const p = m.marker.getLatLng();
@@ -64,32 +72,88 @@
     marks.set(it.id, m);
   }
 
-  /** Rafraîchit un seul média après édition. */
+  function addCamera(cam) {
+    const groups = new Map();
+    cam.videos.forEach(v => {
+      if (!v.pos) return;
+      const k = v.pos.lat.toFixed(6) + ',' + v.pos.lon.toFixed(6);
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(v);
+    });
+    const single = groups.size === 1;
+    groups.forEach((vids, k) => {
+      const key = single ? cam.id : cam.id + '@' + k;
+      const label = single ? cam.name : cam.name + ' · séq. ' + vids.map(v => v.seq).join(', ');
+      const count = cam.videos.length > 1 ? vids.length : 0;
+      const m = { state: '', ids: new Set(vids.map(v => v.id)), node: cam, videos: vids };
+      m.marker = L.marker([vids[0].pos.lat, vids[0].pos.lon], { icon: iconFor('video', label, count), title: label, keyboard: false, riseOnHover: true }).addTo(V.map);
+      m.marker.on('click', () => RP.bus.emit('item:click', pickVideo(vids).id));
+      m.marker.on('dragend', () => {
+        const p = m.marker.getLatLng();
+        dragCameraGroup(cam, vids, { lat: +p.lat.toFixed(7), lon: +p.lng.toFixed(7) });
+      });
+      marks.set(key, m);
+    });
+  }
+
+  /** Séquence pertinente d'un groupe : active, sinon la prochaine, sinon la première. */
+  function pickVideo(vids) {
+    const t = RP.player.t;
+    return vids.find(v => RP.player.activeIds.has(v.id)) ||
+      vids.filter(v => v.timed && v.tStart >= t).sort((a, b) => a.tStart - b.tStart)[0] || vids[0];
+  }
+
+  /** Déplacement d'un repère de caméra : position de la caméra (imposée ou héritée) et/ou positions propres. */
+  function dragCameraGroup(cam, vids, pos) {
+    const usesCamera = cam.applyPosition || vids.some(v => v.posFrom === 'camera');
+    if (usesCamera) M.update(cam.id, { position: pos }, { silent: true });
+    if (!cam.applyPosition) vids.filter(v => v.posFrom === 'video').forEach(v => M.update(v.id, { position: pos }, { silent: true }));
+    RP.bus.emit('model:changed', { id: cam.id, item: cam });
+  }
+
+  function removeMark(key) {
+    const m = marks.get(key);
+    if (!m) return;
+    m.marker.remove(); m.full && m.full.remove(); m.done && m.done.remove();
+    marks.delete(key);
+  }
+
+  /** Rafraîchit les repères d'un média ou de la caméra qui le contient. */
   V.refreshItem = function (id) {
-    const m = marks.get(id);
-    if (m) { m.marker.remove(); m.full && m.full.remove(); m.done && m.done.remove(); marks.delete(id); }
-    const it = M.get(id);
-    if (it) addItem(it);
+    const cam = M.cameraOf(id);
+    if (cam) {
+      Array.from(marks.keys()).forEach(k => { if (marks.get(k).node === cam) removeMark(k); });
+      if (M.get(cam.id)) addCamera(cam);
+    } else {
+      removeMark(id);
+      const it = M.get(id);
+      if (it) addNode(it);
+    }
     if (RP.player) V.update(RP.player.t, RP.player.activeIds, true);
     V.select(selectedId);
   };
 
+  function isSelected(m) {
+    return selectedId != null && (m.ids.has(selectedId) || m.node.id === selectedId);
+  }
+
   /** Appelé à chaque frame par le player. */
   V.update = function (t, activeIds, force) {
-    marks.forEach((m, id) => {
-      const it = M.get(id);
-      if (!it) return;
-      const active = activeIds && activeIds.has(id);
-      const state = (active ? 'active' : 'inactive') + (id === selectedId ? ' selected' : '');
+    marks.forEach((m) => {
+      const it = m.node;
+      let active = false;
+      if (activeIds) m.ids.forEach(id => { if (activeIds.has(id)) active = true; });
+      const sel = isSelected(m);
+      const state = (active ? 'active' : 'inactive') + (sel ? ' selected' : '');
       if (state !== m.state || force) {
         m.state = state;
         const el = m.marker.getElement();
         if (el) {
           el.classList.toggle('active', active);
           el.classList.toggle('inactive', !active);
-          el.classList.toggle('selected', id === selectedId);
+          el.classList.toggle('selected', sel);
         }
-        m.marker.setZIndexOffset(active ? 1000 : id === selectedId ? 500 : 0);
+        m.marker.setZIndexOffset(active ? 1000 : sel ? 500 : 0);
       }
       if (it.type === 'moving-object' && it.track && it.track.length) {
         const p = M.positionAt(it, t);
@@ -111,9 +175,8 @@
 
   const followActive = U.throttle(function (activeIds) {
     const pts = [];
-    activeIds.forEach(id => {
-      const m = marks.get(id);
-      if (m) pts.push(m.marker.getLatLng());
+    marks.forEach(m => {
+      for (const id of m.ids) if (activeIds.has(id)) { pts.push(m.marker.getLatLng()); break; }
     });
     if (!pts.length) return;
     const b = L.latLngBounds(pts);
@@ -144,22 +207,25 @@
   /** Sélection (depuis l'éditeur) : le repère devient déplaçable. */
   V.select = function (id, pan) {
     selectedId = id;
-    marks.forEach((m, mid) => {
-      const it = M.get(mid);
-      const drag = mid === id && it && it.type !== 'moving-object';
+    let first = null;
+    marks.forEach((m) => {
+      const sel = isSelected(m);
+      if (sel && !first) first = m;
+      const drag = sel && m.node.type !== 'moving-object';
       if (m.marker.dragging) drag ? m.marker.dragging.enable() : m.marker.dragging.disable();
       const el = m.marker.getElement();
-      if (el) el.classList.toggle('selected', mid === id);
+      if (el) el.classList.toggle('selected', sel);
     });
-    if (pan && id && marks.has(id)) {
-      const ll = marks.get(id).marker.getLatLng();
+    if (pan && first) {
+      const ll = first.marker.getLatLng();
       if (!V.map.getBounds().pad(-0.2).contains(ll)) V.map.panTo(ll);
     }
   };
 
   V.focus = function (id) {
-    const m = marks.get(id);
-    if (m) V.map.panTo(m.marker.getLatLng(), { animate: true });
+    let target = null;
+    marks.forEach(m => { if (!target && (m.ids.has(id) || m.node.id === id)) target = m; });
+    if (target) V.map.panTo(target.marker.getLatLng(), { animate: true });
   };
 
   /** Mode « placer sur la carte » : résout la promesse avec {lat, lon} ou null (Échap). */

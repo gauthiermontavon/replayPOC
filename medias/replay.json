@@ -163,20 +163,32 @@
   },
   {
     "id": "camera-01",
-    "type": "video",
+    "type": "camera",
     "name": "Caméra 01",
     "position": {
       "lat": 47.123,
       "lon": 7.456
     },
-    "start": "2026-08-24T14:30:00Z",
-    "file": "camera-01.mp4",
-    "duration": 90,
-    "meta": {
-      "source": {
-        "duration": "video"
+    "applyPosition": true,
+    "videos": [
+      {
+        "id": "camera-01-1",
+        "start": "2026-08-24T14:30:00Z",
+        "file": "camera-01.mp4",
+        "duration": 90,
+        "meta": {
+          "source": {
+            "duration": "video"
+          }
+        }
+      },
+      {
+        "id": "camera-01-2",
+        "file": "camera-01/seq2.mp4",
+        "start": "2026-08-24T14:33:00Z",
+        "duration": 45
       }
-    }
+    ]
   },
   {
     "id": "photo-17",
@@ -202,21 +214,27 @@
   },
   {
     "id": "camera-02",
-    "type": "video",
+    "type": "camera",
     "name": "camera-02",
-    "file": "camera-02.mov",
-    "duration": 60,
-    "start": "2026-08-24T14:31:00Z",
     "position": {
       "lat": 47.128,
       "lon": 7.463
     },
-    "meta": {
-      "source": {
-        "duration": "video",
-        "start": "mp4",
-        "position": "mp4"
+    "applyPosition": true,
+    "videos": [
+      {
+        "id": "camera-02-1",
+        "file": "camera-02.mov",
+        "duration": 60,
+        "start": "2026-08-24T14:31:00Z",
+        "meta": {
+          "source": {
+            "duration": "video",
+            "start": "mp4",
+            "position": "mp4"
+          }
+        }
       }
-    }
+    ]
   }
 ]

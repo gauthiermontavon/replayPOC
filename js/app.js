@@ -29,7 +29,7 @@
       RP.editor.onModelChanged(id);
       scheduleSave();
     });
-    RP.bus.on('model:rebuilt', () => { rebuild(true); scheduleSave(); });
+    RP.bus.on('model:rebuilt', () => { rebuild(true); RP.panels.rebuild(); scheduleSave(); });
     RP.bus.on('item:click', (id) => {
       const it = M.get(id);
       if (!it) return;
@@ -112,7 +112,11 @@
       }
       changed = true;
     }
-    (project || []).forEach(raw => { if (raw && typeof raw === 'object') M.add(raw, A.fileFor(raw)); });
+    (project || []).forEach(raw => {
+      if (!raw || typeof raw !== 'object') return;
+      if (raw.type === 'video') changed = true; // ancien format migré en caméra → réécriture
+      M.add(raw, A.fileFor);
+    });
 
     // Fichiers non référencés : extraction automatique des métadonnées
     const referenced = new Set(M.items.map(it => it.file).filter(Boolean));
@@ -123,9 +127,13 @@
       U.toast('Analyse des médias… ' + i + '/' + todo.length, 10000);
       try {
         const raw = await MD.extract(f);
-        if (raw) { M.add(raw, f.file); changed = true; }
+        if (!raw) continue;
+        if (raw.type === 'video') addVideoToFolderCamera(raw, f);
+        else M.add(raw, () => f.file);
+        changed = true;
       } catch (e) { console.warn('Extraction', f.name, e); }
     }
+    finalizeAutoCameras();
     // Vidéos référencées sans durée : on la lit dans le fichier
     for (const it of M.items) {
       if (it.type === 'video' && it.file && !(+it.raw.duration > 0)) {
@@ -152,6 +160,37 @@
   }
 
   A.loadFolder = loadFolder;
+
+  /* Regroupement automatique : un sous-dossier = une caméra ; une vidéo à la racine = sa propre caméra. */
+  const autoCams = new Set();
+  function addVideoToFolderCamera(vraw, f) {
+    const dir = f.path.includes('/') ? f.path.split('/').slice(0, -1).join('/') : '';
+    let cam = null;
+    if (dir) {
+      const dirName = dir.split('/').pop(), slug = U.slug(dirName);
+      cam = M.cameras().find(c => c.id === slug || U.slug(c.name) === slug || c.raw.folder === dir);
+      if (!cam) { cam = M.createCamera({ id: slug, name: dirName, folder: dir }); autoCams.add(cam); }
+    } else {
+      const base = vraw.name || vraw.id;
+      cam = M.createCamera({ id: vraw.id, name: base });
+      autoCams.add(cam);
+    }
+    delete vraw.name; // le nom affiché est celui de la caméra ; la séquence garde son fichier
+    vraw.id = cam.id + '-' + (cam.videos.length + 1);
+    M.addVideoToCamera(cam, vraw, f.file);
+  }
+
+  /** Caméras créées automatiquement : position = 1re position GPS trouvée ; appliquée à toutes si aucune vidéo n'a la sienne. */
+  function finalizeAutoCameras() {
+    autoCams.forEach(cam => {
+      const withPos = cam.videos.filter(v => v.ownPos);
+      if (!cam.raw.position && withPos.length) cam.raw.position = { lat: withPos[0].ownPos.lat, lon: withPos[0].ownPos.lon };
+      const distinct = new Set(withPos.map(v => v.ownPos.lat.toFixed(6) + ',' + v.ownPos.lon.toFixed(6)));
+      cam.raw.applyPosition = distinct.size <= 1;
+      M.update(cam.id, {}, { silent: true });
+    });
+    autoCams.clear();
+  }
 
   function refreshTime(keepView) {
     RP.timeline.setData(keepView);

@@ -12,7 +12,8 @@
     { type: 'video', label: 'Vidéos', color: '--video' },
     { type: 'image', label: 'Photos', color: '--image' }
   ];
-  const AXIS_H = 22, LANE_GAP = 4, LABEL_W = 0;
+  const AXIS_H = 22, LANE_GAP = 4, BASE_LANE_H = 20, ROW_H = 13, MAX_ROWS = 8;
+  let laneH = null; // type -> hauteur (px)
 
   const T = (RP.timeline = { view: null, range: null });
   let cv, ctx, ov, octx, tip, W = 0, H = 0, OW = 0, OH = 0, dpr = 1;
@@ -68,6 +69,12 @@
     T.range = r;
     rows = {};
     LANES.forEach(l => {
+      if (l.type === 'video') {
+        // Une ligne par caméra : toutes ses séquences sur la même ligne
+        rows.video = M.cameras().filter(c => c.timed).sort((a, b) => a.tStart - b.tStart)
+          .map(c => c.videos.filter(v => v.timed));
+        return;
+      }
       const items = M.timed().filter(i => i.type === l.type).sort((a, b) => a.tStart - b.tStart);
       const rr = [];
       items.forEach(it => {
@@ -77,6 +84,11 @@
       });
       rows[l.type] = rr;
     });
+    // Hauteur adaptée au nombre de lignes (plafonnée)
+    laneH = {};
+    LANES.forEach(l => { laneH[l.type] = Math.max(BASE_LANE_H, Math.min((rows[l.type] || []).length, MAX_ROWS) * ROW_H + 4); });
+    const want = AXIS_H + 4 + LANES.reduce((s, l) => s + laneH[l.type], 0) + LANE_GAP * (LANES.length - 1);
+    if (Math.abs(want - H) > 1) cv.style.height = want + 'px'; // le ResizeObserver redessine
     U.$('#tl-title').textContent = r ? U.fmtPeriod(r.start, r.end) : 'Aucun média daté';
     if (!keepView || !T.view) T.fit(); else T.draw();
   };
@@ -118,10 +130,18 @@
   const x = t => (t - T.view.start) / (T.view.end - T.view.start) * W;
   const tAt = px => T.view.start + px / W * (T.view.end - T.view.start);
 
+  /** Libellé d'une barre : nom de la caméra (+ n° de séquence) ou du média. */
+  function labelOf(it) {
+    if (!it.camera) return it.name;
+    return it.camera.videos.length > 1 ? it.camera.name + ' · séq. ' + it.seq : it.camera.name;
+  }
+
   function laneLayout() {
-    const n = LANES.length, avail = H - AXIS_H - 4;
-    const lh = (avail - LANE_GAP * (n - 1)) / n;
-    return LANES.map((l, i) => ({ ...l, y: AXIS_H + 2 + i * (lh + LANE_GAP), h: lh }));
+    const n = LANES.length, avail = H - AXIS_H - 4 - LANE_GAP * (n - 1);
+    const want = LANES.map(l => (laneH ? laneH[l.type] : BASE_LANE_H));
+    const k = avail / want.reduce((a, b) => a + b, 0); // ajuste à la hauteur réelle du canvas
+    let y = AXIS_H + 2;
+    return LANES.map((l, i) => { const h = want[i] * k, o = { ...l, y, h }; y += h + LANE_GAP; return o; });
   }
 
   T.draw = function () {
@@ -206,7 +226,7 @@
               ctx.save();
               ctx.beginPath(); ctx.rect(Math.max(0, x1) + 4, y, Math.min(x2, W) - Math.max(0, x1) - 8, rh); ctx.clip();
               ctx.fillStyle = '#fff'; ctx.font = '600 10px system-ui, sans-serif'; ctx.textAlign = 'left';
-              ctx.fillText(it.name, Math.max(0, x1) + 5, y + rh / 2 + 0.5);
+              ctx.fillText(labelOf(it), Math.max(0, x1) + 5, y + rh / 2 + 0.5);
               ctx.restore();
             }
           }
@@ -308,7 +328,8 @@
     if ((h && h.item) !== (hover && hover.item)) { hover = h; T.draw(); }
     if (h) {
       const it = h.item;
-      tip.innerHTML = '<b>' + U.esc(it.name) + '</b><br>' + U.esc(U.typeLabel[it.type] || it.type) + ' · ' +
+      const kind = it.camera ? 'Vidéo — séquence ' + it.seq + '/' + it.camera.videos.length : (U.typeLabel[it.type] || it.type);
+      tip.innerHTML = '<b>' + U.esc(it.camera ? it.camera.name : it.name) + '</b><br>' + U.esc(kind) + ' · ' +
         (it.type === 'image' ? U.fmtTime(it.tStart) : U.fmtTime(it.tStart) + ' → ' + U.fmtTime(it.tEnd) + ' (' + U.fmtDuration((it.tEnd - it.tStart) / 1000) + ')') +
         (it.missing.length ? '<br><span style="color:var(--warn)">⚠ Incomplet : ' + it.missing.map(k => M.missingLabels[k] || k).join(', ') + '</span>' : '');
       tip.hidden = false;

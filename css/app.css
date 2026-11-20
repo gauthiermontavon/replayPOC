@@ -135,6 +135,12 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: 0.92em; backgr
   transition: transform .2s, background .2s, color .2s;
 }
 .rp-pin svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.rp-count {
+  position: absolute; top: -6px; right: -7px; min-width: 16px; height: 16px; padding: 0 4px;
+  border-radius: 8px; background: var(--c); color: #fff; border: 1.5px solid var(--surface-solid);
+  font-size: 10px; font-weight: 700; line-height: 13px; text-align: center;
+}
+.rp-marker.active .rp-count { background: var(--surface-solid); color: var(--c); }
 .rp-marker.inactive .rp-pin { opacity: .55; transform: scale(.82); }
 .rp-marker.active .rp-pin { background: var(--c); color: #fff; transform: scale(1.12); }
 .rp-marker.active .rp-pin::after {
@@ -255,6 +261,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; }
 .mwin-head .ic { color: var(--c); display: grid; }
 .mwin-head .ic svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .mwin-head .name { font-weight: 650; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mwin-head .seq { font-size: 11px; font-weight: 600; color: var(--c); background: var(--surface-2); padding: 1px 6px; border-radius: 6px; white-space: nowrap; }
 .mwin-head .when { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 11.5px; }
 .mwin-head .icon-btn.sm { width: 24px; height: 24px; font-size: 13px; }
 .mwin-head .icon-btn.on { color: var(--warn); }
@@ -310,6 +317,15 @@ input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; }
 .dr-list .nm { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dr-list .sub { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dr-list .warn { color: var(--warn); font-size: 11px; font-weight: 600; white-space: nowrap; }
+.dr-list .tree-toggle {
+  width: 16px; flex: none; margin-right: -6px; border: 0; background: transparent; padding: 0;
+  color: var(--muted); cursor: pointer; font-size: 12px; text-align: center;
+}
+.dr-list li.child { padding-left: 44px; position: relative; }
+.dr-list li.child::before { content: ""; position: absolute; left: 31px; top: 0; bottom: 0; border-left: 2px solid var(--border); }
+.dr-list li.child .dot { width: 22px; height: 22px; }
+.dr-list li.child .dot svg { width: 12px; height: 12px; }
+.dr-list li.child .nm { font-weight: 500; font-size: 13px; }
 .dr-list .empty { color: var(--muted); text-align: center; padding: 24px; cursor: default; }
 .dr-list .empty:hover { background: transparent; }
 
@@ -326,6 +342,20 @@ input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; }
 }
 .fld input:focus, .fld textarea:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
 .fld.miss input { border-color: var(--warn); }
+.fld input:disabled { opacity: .7; background: var(--surface-2); cursor: not-allowed; }
+.fld > span em { font-style: normal; font-weight: 500; }
+.sel-input { width: 100%; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-solid); padding: 6px 8px; cursor: pointer; }
+.chk { display: flex; align-items: center; gap: 8px; margin: 2px 0 6px; font-weight: 600; font-size: 13px; cursor: pointer; }
+.chk input { width: 16px; height: 16px; accent-color: var(--accent); }
+.seq-list { list-style: none; margin: -4px 0 10px; padding: 0; display: grid; gap: 3px; }
+.seq-list li {
+  display: grid; grid-template-columns: auto 1fr auto; gap: 2px 8px; align-items: center;
+  padding: 6px 8px; border-radius: 8px; background: var(--surface-solid); border: 1px solid var(--border); cursor: pointer;
+}
+.seq-list li:hover { border-color: var(--accent); }
+.seq-list .nm { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.seq-list .sub { grid-column: 2 / 3; font-size: 11px; color: var(--muted); }
+.seq-list .warn { grid-row: 1 / 3; grid-column: 3; color: var(--warn); font-size: 11px; font-weight: 600; }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .ed-btns { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 10px; }
 .ed-note { font-size: 11.5px; color: var(--muted); margin: -4px 0 10px; }
