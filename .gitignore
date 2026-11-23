@@ -9,3 +9,6 @@ desktop.ini
 # Éditeurs
 .vscode/
 .idea/
+
+# Données réelles locales (volumineuses, jamais versionnées)
+medias2/
