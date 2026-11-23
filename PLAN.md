@@ -1,8 +1,10 @@
-# PLAN — Caméra = conteneur de vidéos ET de captures (images)
+# PLAN — Gestionnaire de médias
 
 Historique :
 - ✅ v1 — caméra = conteneur de 1..n vidéos (commit f987e1f).
-- ✅ v2 — une caméra peut aussi contenir des images : des captures d'écran d'une vidéo, traitées comme des séquences.
+- ✅ v2 — une caméra peut aussi contenir des images (captures d'écran de ses vidéos), traitées comme des séquences (commit 150f451).
+- ✅ v3 — ergonomie du gestionnaire de médias (voir plus bas).
+- ✅ v3.1 — aperçu isolé depuis le tiroir (voir plus bas).
 
 Décisions :
 - **Format** : liste unique `medias` (vidéos et images mêlées) ; l'ancien champ `videos` est converti automatiquement.
@@ -45,3 +47,55 @@ Format :
   - [x] sous-dossier avec images
   - [x] rattacher / détacher une photo
   - [x] console sans erreur
+
+---
+
+# v3 — Ergonomie du gestionnaire de médias (tiroir « Médias », `js/editor.js` + CSS)
+
+Décisions :
+- **Glisser-déposer** : on peut faire glisser une vidéo ou une capture d'une caméra, ou une photo indépendante.
+  - On la dépose sur une caméra (sa ligne ou l'un de ses médias) → `M.moveMedia(id, cameraId)`.
+  - Pendant le glisser, des zones apparaissent en bas de la liste : « ＋ Nouvelle caméra », et pour une image « Photo indépendante » (`M.NONE`).
+  - Les cibles valides sont surlignées. On ne peut pas déposer un média sur sa propre caméra.
+- **Fermer le détail** : un bouton ✕ en haut à droite de la zone de détail désélectionne l'élément (le formulaire et la sélection sur la carte se masquent).
+- **Lecture depuis la liste** : un bouton sur chaque ligne datée.
+  - ▶ sur une vidéo, une caméra ou un objet mobile : se place au début et lance la lecture.
+  - 👁 sur une image : se place à l'instant de la capture, en pause, et ouvre sa fenêtre.
+  - Si l'élément est en cours de lecture, le bouton devient ⏸ (pause).
+
+## Étapes
+- [x] 1. PLAN.md
+- [x] 2. Glisser-déposer
+  - [x] lignes déplaçables
+  - [x] cibles caméra
+  - [x] zones « Nouvelle caméra » / « Photo indépendante »
+  - [x] retour visuel
+- [x] 3. Bouton ✕ de la zone de détail (`E.deselect()`)
+- [x] 4. Boutons ▶ / 👁 / ⏸ par ligne, mis à jour avec l'état de lecture
+- [x] 5. Vérification navigateur : déplacement par glisser, fermeture du détail, lecture depuis la liste, console sans erreur
+- [x] 6. Docs : README.md, CLAUDE.md
+
+---
+
+# v3.1 — Aperçu isolé depuis le tiroir
+
+Retour utilisateur :
+- Un média lancé depuis le tiroir doit être vu **seul et isolé**. Ni la timeline, ni les autres médias ne doivent se lancer à la suite.
+- Les images doivent avoir un bouton « Voir ».
+- Le bouton de lecture du conteneur caméra est supprimé.
+
+Décisions :
+- Un **visionneur d'aperçu** modal s'ouvre, indépendant de l'horloge (`RP.panels.preview(id)`).
+  - Vidéo : lecteur natif (contrôles, lecture automatique). Image : affichage plein cadre.
+  - Titre : caméra et séquence, date et fichier.
+  - Fermeture par ✕, Échap ou clic sur le fond.
+  - La lecture de la timeline est mise en pause à l'ouverture, et ni la tête de lecture ni les autres fenêtres ne bougent.
+- Liste : « ▶ Lire » sur les vidéos, « 👁 Voir » sur les images (caméra ou photo indépendante). Plus de bouton sur les caméras.
+  - Les objets mobiles gardent ▶ : ils se placent sur la timeline et la lancent, car un aperçu isolé n'a pas de sens pour une trajectoire.
+- Formulaire de détail d'une vidéo ou d'une image : bouton « ▶ Lire » ou « 👁 Voir » (aperçu), à côté de « Aller au début ».
+
+## Étapes
+- [x] 1. Visionneur d'aperçu (`index.html`, `js/panels.js`, CSS)
+- [x] 2. Boutons de la liste et du formulaire (`js/editor.js`)
+- [x] 3. Vérification : aperçu isolé (timeline en pause, aucune autre fenêtre ouverte), boutons, console sans erreur
+- [x] 4. Docs : README.md, CLAUDE.md

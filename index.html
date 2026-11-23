@@ -151,6 +151,21 @@
 
   <input type="file" id="import-input" accept=".gpx,.json" multiple hidden>
   <div id="lightbox" hidden><img alt=""></div>
+
+  <!-- Aperçu isolé d'un média (lancé depuis le tiroir, indépendant de la timeline) -->
+  <div id="preview" hidden>
+    <div class="pv-card" role="dialog" aria-modal="true" aria-labelledby="pv-title">
+      <header class="pv-head">
+        <span class="pv-ic"></span>
+        <div class="pv-titles">
+          <div id="pv-title" class="pv-title"></div>
+          <div id="pv-sub" class="pv-sub"></div>
+        </div>
+        <button class="icon-btn sm" id="pv-close" title="Fermer (Échap)">✕</button>
+      </header>
+      <div id="pv-body" class="pv-body"></div>
+    </div>
+  </div>
   <div id="toast" role="status"></div>
 
   <!-- Librairies embarquées (aucune dépendance réseau) -->

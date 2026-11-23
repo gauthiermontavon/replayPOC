@@ -32,7 +32,12 @@
     RP.bus.on('mute', m => wins.forEach(w => { if (w.video) w.video.muted = m; }));
     const lb = U.$('#lightbox');
     lb.addEventListener('click', () => { lb.hidden = true; lb.querySelector('img').removeAttribute('src'); });
-    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !lb.hidden) lb.click(); });
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Escape') return;
+      if (!lb.hidden) lb.click(); else PN.closePreview();
+    });
+    U.$('#pv-close').addEventListener('click', () => PN.closePreview());
+    U.$('#preview').addEventListener('click', e => { if (e.target.id === 'preview') PN.closePreview(); });
   };
 
   PN.isOpen = id => wins.has(id);
@@ -173,6 +178,69 @@
   PN.rebuild = function () {
     PN.closeAll();
     M.activeAt(RP.player.t).forEach(it => { if (it.type === 'video' || it.type === 'image') PN.open(it); });
+  };
+
+  /* ---------------------------------------------------------- Aperçu isolé */
+  let pvUrl = null;
+
+  /**
+   * Visionne un média seul, hors timeline : la lecture générale est mise en pause,
+   * la tête de lecture et les autres fenêtres ne bougent pas.
+   */
+  PN.preview = function (id) {
+    const it = M.get(id);
+    if (!it || (it.type !== 'video' && it.type !== 'image')) return;
+    PN.closePreview();
+    RP.player.pause();
+    const pv = U.$('#preview'), body = U.$('#pv-body');
+    const cam = it.camera;
+    U.$('.pv-ic', pv).innerHTML = U.icons[it.type];
+    pv.className = it.type;
+    U.$('#pv-title').textContent = cam ? cam.name + (cam.medias.length > 1 ? ' · séq. ' + it.seq + '/' + cam.medias.length : '') : it.name;
+    U.$('#pv-sub').textContent = [
+      it.type === 'image' ? (cam ? 'Capture' : 'Photo') : 'Vidéo',
+      it.timed ? U.fmtDateTime(it.tStart) : 'sans date',
+      it.type === 'video' && it.raw.duration ? U.fmtDuration(+it.raw.duration) : '',
+      it.raw.file || ''
+    ].filter(Boolean).join(' · ');
+    body.innerHTML = '';
+    if (!it.file) {
+      body.append(U.el('div', { class: 'missing', html: 'Fichier introuvable dans le dossier<br><small>' + U.esc(it.raw.file || '(aucun fichier associé)') + '</small>' }));
+    } else {
+      pvUrl = URL.createObjectURL(it.file);
+      if (it.type === 'video') {
+        const v = U.el('video', { controls: true, autoplay: true, playsinline: true, src: pvUrl });
+        v.addEventListener('error', () => { body.innerHTML = '<div class="missing">Format vidéo non lisible par ce navigateur</div>'; });
+        body.append(v);
+        const p = v.play(); if (p && p.catch) p.catch(() => {});
+      } else {
+        body.append(U.el('img', { alt: it.name, src: pvUrl }));
+      }
+    }
+    pv.hidden = false;
+    U.$('#pv-close').focus();
+  };
+
+  PN.closePreview = function () {
+    const pv = U.$('#preview');
+    if (!pv || pv.hidden) return;
+    const v = U.$('#pv-body video');
+    if (v) { v.pause(); v.removeAttribute('src'); v.load(); }
+    U.$('#pv-body').innerHTML = '';
+    if (pvUrl) { URL.revokeObjectURL(pvUrl); pvUrl = null; }
+    pv.hidden = true;
+  };
+  PN.isPreviewOpen = () => !U.$('#preview').hidden;
+
+  /** Ramène les fenêtres flottantes hors d'une bande de `px` pixels au bord droit (tiroir ouvert). */
+  PN.avoidRight = function (px) {
+    const limit = innerWidth - px - 16;
+    wins.forEach(w => {
+      if (!w.el.classList.contains('floating')) return;
+      // offsetLeft/offsetWidth : dimensions hors transformation (animation d'ouverture en cours)
+      const width = w.el.offsetWidth;
+      if (w.el.offsetLeft + width > limit) w.el.style.left = Math.max(8, limit - width) + 'px';
+    });
   };
 
   function layout() {

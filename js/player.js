@@ -32,7 +32,8 @@
     RP.bus.on('seek', t => P.seek(t));
 
     document.addEventListener('keydown', (e) => {
-      if (e.target.closest('input, textarea, select, [contenteditable]')) return;
+      if (e.target.closest && e.target.closest('input, textarea, select, [contenteditable]')) return;
+      if (RP.panels.isPreviewOpen && RP.panels.isPreviewOpen()) return; // aperçu isolé : la timeline ne réagit pas
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       switch (e.key) {
         case ' ': e.preventDefault(); P.toggle(); break;

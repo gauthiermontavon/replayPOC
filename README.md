@@ -13,6 +13,10 @@ Copiez le dossier entier sur une clé USB et double-cliquez sur **`index.html`**
    - à défaut, date déduite du nom de fichier (`VID_20260824_143000.mp4`…).
 3. Bouton ☰ (badge orange = médias incomplets) : compléter date, position (clic sur la carte ou repère déplaçable), durée,
    décalage d'horloge. Les modifications sont **enregistrées automatiquement dans `replay.json`** du dossier.
+   - **Glisser-déposer** une vidéo, une capture ou une photo sur une caméra pour l'y rattacher (zones « ＋ Nouvelle caméra » et
+     « Photo indépendante » en bas de la liste pendant le glisser).
+   - « ▶ Lire » (vidéo) / « 👁 Voir » (image) sur une ligne ouvre un **aperçu isolé** du média : il est vu seul, la timeline
+     est mise en pause et aucun autre média ne s'enchaîne (Échap ou ✕ pour fermer). ✕ en haut à droite du détail le referme.
 4. Lecture : les fenêtres vidéo/photo **s'ouvrent automatiquement à leur début et se ferment à leur fin**.
    📌 épingle une fenêtre, ✕ la ferme jusqu'au prochain passage ; glisser l'en-tête la détache (double-clic pour la réancrer).
 

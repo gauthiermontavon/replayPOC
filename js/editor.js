@@ -24,7 +24,8 @@
   E.toggle = function (open) {
     const o = open == null ? !drawer.classList.contains('open') : open;
     drawer.classList.toggle('open', o);
-    if (o) E.renderList();
+    document.body.classList.toggle('drawer-open', o); // décale les fenêtres médias hors du tiroir
+    if (o) { E.renderList(); RP.panels.avoidRight(drawer.getBoundingClientRect().width); }
     else { RP.mapview.select(null); }
   };
   E.isOpen = () => drawer.classList.contains('open');
@@ -62,10 +63,142 @@
       extra && extra.toggle || null,
       U.el('span', { class: 'dot', html: U.icons[node.type === 'camera' ? 'video' : node.type] || U.icons.pin }),
       U.el('div', { class: 'meta' }, [U.el('div', { class: 'nm', text: name }), U.el('div', { class: 'sub', text: sub })]),
-      warn
+      warn,
+      playButton(node)
     ]);
     li.onclick = () => E.select(node.id);
+    setupDrag(li, node);
     return li;
+  }
+
+  /* ------------------------------------------------------------ Lecture depuis la liste */
+
+  /** Le nœud (ou un média de la caméra) est-il actif à l'instant courant ? */
+  function isActiveNow(node) {
+    if (!node) return false;
+    if (node.type === 'camera') return node.medias.some(v => RP.player.activeIds.has(v.id));
+    return RP.player.activeIds.has(node.id);
+  }
+
+  /**
+   * Bouton de ligne :
+   *  - vidéo « ▶ Lire » / image « 👁 Voir » → aperçu isolé (hors timeline) ;
+   *  - objet mobile ▶/⏸ → lecture sur la timeline depuis son début ;
+   *  - caméra : aucun bouton (conteneur).
+   */
+  function playButton(node) {
+    if (node.type === 'camera') return null;
+    if (node.type === 'video' || node.type === 'image') {
+      const img = node.type === 'image';
+      const b = U.el('button', { class: 'row-play pill ' + node.type, type: 'button',
+        title: img ? 'Voir cette image seule' : 'Lire cette séquence seule (hors timeline)', text: img ? '👁 Voir' : '▶ Lire' });
+      b.addEventListener('click', (e) => { e.stopPropagation(); E.play(node.id); });
+      return b;
+    }
+    if (!node.timed) return null;
+    const b = U.el('button', { class: 'row-play', type: 'button' });
+    b.addEventListener('click', (e) => { e.stopPropagation(); E.play(node.id); });
+    updatePlayButton(b, node);
+    return b;
+  }
+
+  function updatePlayButton(b, node) {
+    if (b.classList.contains('pill')) return; // boutons d'aperçu : état fixe
+    const pause = RP.player.playing && isActiveNow(node);
+    b.textContent = pause ? '⏸' : '▶';
+    b.title = pause ? 'Mettre en pause' : 'Lire sur la timeline depuis le début';
+    b.classList.toggle('on', pause);
+  }
+
+  /** Vidéo / image : aperçu isolé. Objet mobile : lecture sur la timeline (⏸ s'il est en cours). */
+  E.play = function (id) {
+    const node = M.get(id);
+    if (!node) return;
+    if (node.type === 'video' || node.type === 'image') { RP.panels.preview(id); return; }
+    if (!node.timed) return;
+    if (RP.player.playing && isActiveNow(node)) { RP.player.pause(); markActive(); return; }
+    RP.player.seek(node.tStart);
+    RP.player.play();
+    RP.mapview.focus(id);
+    markActive();
+  };
+
+  /* ------------------------------------------------------------ Glisser-déposer (changer de caméra) */
+  let dragId = null;
+
+  /** Médias déplaçables : vidéos et captures d'une caméra, photos indépendantes. */
+  const draggable = node => (node.type === 'video' || node.type === 'image');
+
+  /** Caméra visée par une ligne de la liste (la ligne caméra elle-même ou l'un de ses médias). */
+  function cameraOfRow(li) {
+    const n = li && M.get(li.dataset.id);
+    return n ? M.cameraOf(n.id) : null;
+  }
+
+  function canDrop(cam) {
+    const it = dragId && M.get(dragId);
+    return !!(it && cam && cam !== it.camera);
+  }
+
+  function setupDrag(li, node) {
+    if (draggable(node)) {
+      li.draggable = true;
+      li.addEventListener('dragstart', (e) => {
+        dragId = node.id;
+        e.dataTransfer.effectAllowed = 'move';
+        try { e.dataTransfer.setData('text/plain', node.id); } catch (er) { /* ignore */ }
+        li.classList.add('dragging');
+        showDropZones(node);
+        // Surligne les caméras qui peuvent recevoir le média
+        U.$$('li[data-id]', list).forEach(x => x.classList.toggle('drop-ok', canDrop(cameraOfRow(x))));
+      });
+      li.addEventListener('dragend', endDrag);
+    }
+    li.addEventListener('dragover', (e) => {
+      if (!canDrop(cameraOfRow(li))) return;
+      e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+      const cam = cameraOfRow(li);
+      U.$$('li[data-id]', list).forEach(x => x.classList.toggle('drop-hover', cameraOfRow(x) === cam));
+    });
+    li.addEventListener('dragleave', () => li.classList.remove('drop-hover'));
+    li.addEventListener('drop', (e) => {
+      const cam = cameraOfRow(li);
+      if (!canDrop(cam)) return;
+      e.preventDefault();
+      dropTo(cam.id);
+    });
+  }
+
+  function showDropZones(node) {
+    const zones = U.el('li', { class: 'drop-zones' });
+    const mk = (label, target) => {
+      const z = U.el('div', { class: 'drop-zone', text: label });
+      z.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; z.classList.add('drop-hover'); });
+      z.addEventListener('dragleave', () => z.classList.remove('drop-hover'));
+      z.addEventListener('drop', (e) => { e.preventDefault(); dropTo(target); });
+      zones.append(z);
+    };
+    mk('＋ Nouvelle caméra', null);
+    if (node.type === 'image' && node.camera) mk('🖼 Photo indépendante', M.NONE);
+    list.append(zones);
+    zones.scrollIntoView({ block: 'nearest' });
+  }
+
+  function endDrag() {
+    dragId = null;
+    U.$$('.dragging, .drop-ok, .drop-hover', list).forEach(x => x.classList.remove('dragging', 'drop-ok', 'drop-hover'));
+    U.$$('.drop-zones', list).forEach(x => x.remove());
+  }
+
+  function dropTo(target) {
+    const id = dragId;
+    endDrag();
+    const it = M.get(id);
+    if (!it) return;
+    const to = M.moveMedia(id, target); // émet model:rebuilt → liste redessinée
+    if (target === M.NONE) U.toast('« ' + it.name + ' » est maintenant une photo indépendante');
+    else if (to) U.toast('« ' + it.name + ' » rattaché à « ' + to.name + ' »');
+    if (E.selected === id || !E.selected) E.select(id, { noPan: true });
   }
 
   function renderCameraRows(cam) {
@@ -92,8 +225,9 @@
     if (!E.isOpen()) return;
     U.$$('li[data-id]', list).forEach(li => {
       const node = M.get(li.dataset.id);
-      const on = node && node.type === 'camera' ? node.medias.some(v => RP.player.activeIds.has(v.id)) : RP.player.activeIds.has(li.dataset.id);
-      li.classList.toggle('active-now', !!on);
+      li.classList.toggle('active-now', isActiveNow(node));
+      const b = li.querySelector('.row-play');
+      if (b && node) updatePlayButton(b, node);
     });
   }
 
@@ -106,6 +240,15 @@
     if (li) li.scrollIntoView({ block: 'nearest' });
     RP.mapview.select(id, !(opts && opts.noPan));
     renderForm();
+  };
+
+  /** Ferme la zone de détail et désélectionne l'élément (liste et carte). */
+  E.deselect = function () {
+    E.selected = null;
+    form.hidden = true;
+    form.innerHTML = '';
+    U.$$('li.sel', list).forEach(li => li.classList.remove('sel'));
+    RP.mapview.select(null);
   };
 
   function field(key, label, input, extra) {
@@ -195,6 +338,7 @@
     if (!it) { form.hidden = true; return; }
     form.hidden = false;
     form.innerHTML = '';
+    form.append(U.el('button', { class: 'icon-btn sm ed-close', type: 'button', title: 'Fermer le détail', text: '✕', onclick: () => E.deselect() }));
     if (it.type === 'camera') return renderCameraForm(it);
     const r = it.raw, src = (r.meta && r.meta.source) || {};
     const srcTxt = Object.keys(src).map(k => (M.missingLabels[k] || k) + ' : ' + src[k]).join(' · ');
@@ -203,7 +347,7 @@
     form.append(
       U.el('h3', {}, [document.createTextNode(cam ? (it.type === 'image' ? 'Capture' : 'Vidéo') + ' — séquence ' + it.seq + '/' + cam.medias.length : (U.typeLabel[it.type] || it.type))]),
       U.el('div', { class: 'file', text: r.file ? r.file + (it.file ? '' : ' — introuvable dans le dossier') : 'Aucun fichier associé' }),
-      srcTxt ? U.el('div', { class: 'ed-note', text: 'Sources : ' + srcTxt }) : null
+      srcTxt ? U.el('div', { class: 'ed-note', text: 'Sources : ' + srcTxt }) : ''
     );
 
     const f = {};
@@ -278,7 +422,10 @@
     form.append(field('notes', 'Notes', f.notes));
 
     form.append(U.el('div', { class: 'ed-btns' }, [
-      it.timed ? U.el('button', { class: 'btn sm primary', type: 'button', text: '▶ Aller au début', onclick: () => { RP.player.seek(it.tStart); RP.panels.reveal(it.id); } }) : null
+      it.type === 'video' || it.type === 'image'
+        ? U.el('button', { class: 'btn sm primary', type: 'button', text: it.type === 'image' ? '👁 Voir' : '▶ Lire', title: 'Aperçu isolé, hors timeline', onclick: () => RP.panels.preview(it.id) })
+        : null,
+      it.timed ? U.el('button', { class: 'btn sm', type: 'button', text: '⇥ Aller au début (timeline)', onclick: () => { RP.player.seek(it.tStart); RP.panels.reveal(it.id); } }) : null
     ]));
 
     // Écouteurs
