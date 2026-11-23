@@ -15,7 +15,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Hard constraints (do not break)
 
 - **No build step, no npm dependencies at runtime, no CDN.** Third-party libs are vendored in `vendor/` (Leaflet 1.9.4, exifr 7.1.3 lite UMD, topojson-client, world-atlas countries-50m wrapped as `window.WORLD_TOPO = …`).
-- **No ES modules and no `fetch()` of local files** — both fail under `file://` in Chrome. All JS files are classic `<script>` tags attaching to the global namespace `window.RP`; load order in `index.html` matters (`util` → `model` → `storage` → `metadata` → `basemap` → `map` → `timeline` → `player` → `panels` → `editor` → `app`). Embedded data must be a `.js` file assigning a global.
+- **No ES modules and no `fetch()` of local files** — both fail under `file://` in Chrome. All JS files are classic `<script>` tags attaching to the global namespace `window.RP`; load order in `index.html` matters (`util` → `model` → `storage` → `metadata` → `basemap` → `map` → `timeline` → `player` → `panels` → `events` → `editor` → `app`). Embedded data must be a `.js` file assigning a global.
 - `tiles/config.js` must always exist (it sets `window.LOCAL_TILES = null` by default) so the script tag never 404s.
 - Media files are accessed only through `File` objects (File System Access API directory handle, or `<input webkitdirectory>` fallback) and `URL.createObjectURL`.
 
@@ -56,6 +56,7 @@ Types:
   - `M.moveMedia(id, cameraId | null | M.NONE)` (alias `moveVideo`) re-parents a media; `null` = new camera, and `M.NONE` detaches an image as a standalone photo (videos always stay in a camera). A camera left empty is deleted; emits `model:rebuilt`.
 - Videos (`start`, `duration`, own `position`) without a duration get a 30 s placeholder window and are flagged missing.
 - `image` (`time`, `display` default 10 s, `position`); `moving-object` (`track[]`).
+- `event` (top level): a scene description with `title`, `description`, `time`, `duration` (default 15 s) and an optional `position`. Missing fields flagged: `time`, `description`. Events are ordinary playable items in `M.items`, so they get `media:enter`/`media:exit`. `M.createEvent(t, props)` and `M.remove(id)` (events only) both emit `model:rebuilt`.
 
 Manual edits set `raw.meta.source[field] = 'manuel'`. `M.add(raw, resolveFile)` takes a function `(raw) => File`. In `app.js`, unreferenced videos and images are grouped one camera per sub-folder; a video at the root gets its own camera, and an image at the root stays standalone.
 
@@ -69,7 +70,9 @@ Manual edits set `raw.meta.source[field] = 'manuel'`. `M.add(raw, resolveFile)` 
 
 **Panels (`js/panels.js`)** implement the key requirement: a media window opens automatically when the playhead reaches its `start` and closes at its `end`, for playback and any seek. Video windows are keyed by **camera id**: one window per camera swaps its source when the next video sequence enters, and closes only when no video of that camera is active. Camera captures (images) keep their own window keyed by image id, titled with the camera name. `PN.rebuild()` reopens windows after `model:rebuilt`. Manual ✕ adds the current sequence id to `dismissed` until the next exit; 📌 pin keeps it open past the end. Video elements are slaved to the clock on each `tick` (re-seek when drift exceeds a rate-dependent threshold, `playbackRate` clamped to 0.0625–16); object URLs are revoked on close.
 
-**Timeline (`js/timeline.js`)** is a single canvas plus an overview canvas: lanes per type (one row per camera in the video lane, with its captures drawn as diamonds on it; the Photos lane only shows standalone images; greedy row stacking for the others; canvas height grows with row count), adaptive tick steps aligned to local time, wheel zoom around the cursor, drag pan, click = `seek` event.
+**Events (`js/events.js`)** renders active events as stacked "subtitle" cards in `#events-zone`, above the playbar and centred between the map tools and the media dock. At most 3 cards are visible, then "+n". Each card has a remaining-time bar updated on `tick`, and a click opens the event in the editor. Creation goes through `RP.editor.addEvent()`, triggered by the playbar ⚑+ button, the E key or "＋ Évènement" in the drawer. The toast now appears under the timeline so it never covers the cards.
+
+**Timeline (`js/timeline.js`)** is a single canvas plus an overview canvas: lanes per type (an "Évènements" lane at the top with ⚑ pictograms and duration bars; one row per camera in the video lane, with its captures drawn as diamonds on it; the Photos lane only shows standalone images; greedy row stacking for the others; canvas height grows with row count), adaptive tick steps aligned to local time, wheel zoom around the cursor, drag pan, click = `seek` event.
 
 **Editor (`js/editor.js`)** is the "Médias" drawer, with the tree list (cameras → medias) on top and the detail form below.
 - **HTML5 drag & drop**: video, image and standalone-photo rows can be dragged. They drop onto any row of a camera, or onto the temporary zones "Nouvelle caméra" / "Photo indépendante" appended while dragging. Dropping calls `M.moveMedia`.

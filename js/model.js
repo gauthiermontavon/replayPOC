@@ -11,12 +11,14 @@
 
   const DEFAULT_IMAGE_DISPLAY = 10;    // s d'affichage d'une photo
   const UNKNOWN_VIDEO_DURATION = 30;   // s, placeholder si la durée est inconnue
+  const DEFAULT_EVENT_DURATION = 15;   // s d'affichage d'un évènement
 
   const M = (RP.model = {
     roots: [],
     items: [],
     byId: new Map(),
-    DEFAULT_IMAGE_DISPLAY
+    DEFAULT_IMAGE_DISPLAY,
+    DEFAULT_EVENT_DURATION
   });
 
   /* ------------------------------------------------------------ Calculs */
@@ -54,6 +56,14 @@
       if (!it.pos) it.missing.push('position');
       const disp = U.isNum(+r.display) && +r.display > 0 ? +r.display : DEFAULT_IMAGE_DISPLAY;
       if (s != null) { it.tStart = s + off; it.tEnd = it.tStart + disp * 1000; }
+    } else if (r.type === 'event') {
+      // Évènement : description de scène affichée pendant `duration` secondes ; position facultative
+      it.name = r.title || r.id;
+      const s = U.parseTime(r.time);
+      if (s == null) it.missing.push('time');
+      if (!String(r.description || '').trim()) it.missing.push('description');
+      const dur = U.isNum(+r.duration) && +r.duration > 0 ? +r.duration : DEFAULT_EVENT_DURATION;
+      if (s != null) { it.tStart = s + off; it.tEnd = it.tStart + dur * 1000; }
     } else if (r.type === 'moving-object') {
       const pts = (Array.isArray(r.track) ? r.track : [])
         .map(p => ({ t: U.parseTime(p.time), lat: +p.lat, lon: +p.lon }))
@@ -272,6 +282,28 @@
     it.camera = null;
   }
 
+  /** Crée un évènement (description de scène) à l'instant `t` (ms). Émet model:rebuilt. */
+  M.createEvent = function (t, props) {
+    const raw = Object.assign({ type: 'event', title: 'Nouvel évènement', description: '', time: U.iso(Math.floor(t / 1000) * 1000), duration: DEFAULT_EVENT_DURATION }, props);
+    raw.id = uniqueId(raw.id || 'evt');
+    const it = compute({ raw, file: null });
+    M.items.push(it);
+    M.byId.set(it.id, it);
+    M.roots.push(it);
+    RP.bus.emit('model:rebuilt');
+    return it;
+  };
+
+  /** Supprime un élément de premier niveau sans fichier (évènement). Émet model:rebuilt. */
+  M.remove = function (id) {
+    const it = M.byId.get(id);
+    if (!it || it.type !== 'event') return false;
+    M.items = M.items.filter(x => x !== it);
+    removeRoot(it);
+    RP.bus.emit('model:rebuilt');
+    return true;
+  };
+
   M.recomputeAll = function () { M.roots.forEach(recompute); };
 
   M.timed = () => M.items.filter(i => i.timed);
@@ -334,5 +366,5 @@
     return files.find(f => f.path.toLowerCase() === want) || files.find(f => f.name.toLowerCase() === base) || null;
   };
 
-  M.missingLabels = { start: 'date de début', time: 'date', position: 'position', duration: 'durée', track: 'trajectoire', medias: 'médias' };
+  M.missingLabels = { start: 'date de début', time: 'date', position: 'position', duration: 'durée', track: 'trajectoire', medias: 'médias', description: 'description' };
 })();

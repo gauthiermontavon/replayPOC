@@ -14,6 +14,7 @@
   --video: #2563eb;
   --image: #db2777;
   --moving: #059669;
+  --event: #d97706;
   --warn: #f59e0b;
   --danger: #dc2626;
   --ok: #16a34a;
@@ -42,6 +43,7 @@
     --video: #60a5fa;
     --image: #f472b6;
     --moving: #34d399;
+    --event: #fbbf24;
     --shadow: 0 8px 28px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.3);
     --sea: #0f1d2e;
     --land: #1c2433;
@@ -127,6 +129,7 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: 0.92em; backgr
 .rp-marker.video { --c: var(--video); }
 .rp-marker.image { --c: var(--image); }
 .rp-marker.moving-object { --c: var(--moving); }
+.rp-marker.event { --c: var(--event); }
 .rp-pin {
   position: relative; width: 34px; height: 34px; border-radius: 50%;
   display: grid; place-items: center;
@@ -242,6 +245,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; }
 #dock.many { width: 290px; }
 /* Tiroir « Médias » ouvert : les fenêtres ancrées se décalent dans la zone visible */
 body.drawer-open #dock { right: calc(var(--drawer-w) + 16px); max-width: calc(100vw - var(--drawer-w) - 90px); }
+body.drawer-open #events-zone { right: calc(var(--drawer-w) + 392px); }
 #floating { position: fixed; inset: 0; pointer-events: none; z-index: 420; }
 .mwin {
   pointer-events: auto;
@@ -306,6 +310,33 @@ body.drawer-open #dock { right: calc(var(--drawer-w) + 16px); max-width: calc(10
 #lightbox { position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,.88); display: grid; place-items: center; cursor: zoom-out; }
 #lightbox img { max-width: 96vw; max-height: 94vh; object-fit: contain; }
 
+/* ------------------------------------------------------------ Évènements */
+#events-zone {
+  /* Centré dans l'espace libre entre les outils carte (gauche) et la colonne des vignettes (droite) */
+  position: fixed; bottom: 96px; left: 72px; right: 392px; margin: 0 auto;
+  max-width: 640px; z-index: 480; transition: right .25s ease;
+  display: flex; flex-direction: column; gap: 6px; pointer-events: none;
+}
+.ev-card {
+  pointer-events: auto; cursor: pointer;
+  background: var(--surface); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  border: 1px solid var(--border); border-left: 4px solid var(--event);
+  border-radius: 12px; box-shadow: var(--shadow); overflow: hidden;
+  animation: evIn .22s ease-out;
+}
+.ev-card.closing { animation: evOut .18s ease-in forwards; }
+@keyframes evIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes evOut { to { opacity: 0; transform: translateY(10px); } }
+.ev-head { display: flex; align-items: baseline; gap: 8px; padding: 8px 12px 2px; }
+.ev-ic { color: var(--event); align-self: center; display: grid; }
+.ev-ic svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.ev-time { font-size: 12px; font-weight: 600; color: var(--event); font-variant-numeric: tabular-nums; }
+.ev-title { font-weight: 700; font-size: 14px; }
+.ev-desc { padding: 0 12px 8px 36px; font-size: 13.5px; line-height: 1.45; white-space: pre-wrap; max-height: 6.5em; overflow-y: auto; }
+.ev-prog { height: 3px; background: var(--surface-2); }
+.ev-prog > i { display: block; height: 100%; width: 100%; background: var(--event); margin-left: auto; transition: width .2s linear; }
+.ev-more { pointer-events: auto; align-self: center; font-size: 11.5px; font-weight: 600; color: var(--event); background: var(--surface); padding: 2px 10px; border-radius: 10px; box-shadow: var(--shadow); }
+
 /* ---------------------------------------------------------------- Tiroir */
 #drawer {
   position: fixed; top: 0; right: 0; bottom: 0; width: var(--drawer-w); max-width: 100%;
@@ -322,7 +353,7 @@ body.drawer-open #dock { right: calc(var(--drawer-w) + 16px); max-width: calc(10
 .save-state.ok { color: var(--ok); }
 .save-state.ro { color: var(--warn); }
 .save-state.err { color: var(--danger); }
-.dr-actions { display: flex; gap: 6px; align-items: center; padding: 0 16px 10px; border-bottom: 1px solid var(--border); }
+.dr-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 0 16px 10px; border-bottom: 1px solid var(--border); }
 .dr-actions .seg { margin-right: auto; }
 .seg { display: inline-flex; background: var(--surface-2); border-radius: 9px; padding: 2px; }
 .seg button { border: 0; background: transparent; padding: 4px 10px; border-radius: 7px; cursor: pointer; font-size: 12.5px; }
@@ -367,6 +398,9 @@ body.drawer-open #dock { right: calc(var(--drawer-w) + 16px); max-width: calc(10
   font-size: 11.5px; font-weight: 600; white-space: nowrap; opacity: .8;
 }
 .dr-list .row-play.pill.image { color: var(--image); }
+.dr-list .row-play.pill.event { color: var(--event); }
+.dr-list .row-play.pill.event:hover { background: var(--event); border-color: var(--event); color: #fff; }
+.dr-list .event .dot { background: var(--event); }
 .dr-list .row-play.pill.image:hover { background: var(--image); border-color: var(--image); color: #fff; }
 /* Glisser-déposer */
 .dr-list li[draggable="true"] { cursor: grab; }
@@ -433,7 +467,7 @@ body.drawer-open #dock { right: calc(var(--drawer-w) + 16px); max-width: calc(10
 
 /* ----------------------------------------------------------------- Toast */
 #toast {
-  position: fixed; left: 50%; bottom: 96px; transform: translate(-50%, 20px);
+  position: fixed; left: 50%; top: calc(var(--tl-height) + 28px); transform: translate(-50%, -12px);
   background: var(--text); color: var(--bg); padding: 9px 16px; border-radius: 10px;
   font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s;
   z-index: 3000; max-width: calc(100% - 32px);
@@ -452,8 +486,10 @@ body.drawer-open #dock { right: calc(var(--drawer-w) + 16px); max-width: calc(10
   .pb-date { display: none; }
   #map-tools { left: 8px; }
   #dock, #dock.many { width: min(260px, calc(100% - 70px)); right: 8px; bottom: 150px; }
-  #toast { bottom: 150px; }
+
   .leaflet-bottom.leaflet-left { bottom: 140px; }
+  #events-zone, body.drawer-open #events-zone { bottom: 150px; left: 8px; right: 8px; }
+  .ev-desc { padding-left: 12px; max-height: 4.5em; }
   /* Sur mobile le tiroir occupe tout l'écran : pas de décalage */
   body.drawer-open #dock { right: 8px; max-width: none; }
 }

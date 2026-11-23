@@ -44,6 +44,7 @@
         case 'Home': P.seek(P.range && P.range.start); break;
         case 'End': P.seek(P.range && P.range.end); break;
         case 'm': case 'M': P.setMuted(!P.muted); break;
+        case 'e': case 'E': RP.editor.addEvent(); break;
         case ',': P.setRate(SPEEDS[Math.max(0, SPEEDS.indexOf(P.rate) - 1)]); break;
         case '.': P.setRate(SPEEDS[Math.min(SPEEDS.length - 1, SPEEDS.indexOf(P.rate) + 1)]); break;
       }

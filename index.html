@@ -58,6 +58,9 @@
   <div id="dock"></div>
   <div id="floating"></div>
 
+  <!-- Évènements en cours (bandeau au-dessus de la playbar) -->
+  <div id="events-zone" aria-live="polite"></div>
+
   <!-- Playbar (bas) -->
   <footer id="playbar" class="glass">
     <div class="pb-time">
@@ -95,6 +98,9 @@
         <option value="8">8×</option>
         <option value="16">16×</option>
       </select>
+      <button class="icon-btn" id="pb-add-event" title="Ajouter un évènement à cet instant (E)">
+        <svg viewBox="0 0 24 24"><path d="M5 21V4"/><path d="M5 4h9l-2 3.5 2 3.5H5"/><path d="M18 14v6M15 17h6"/></svg>
+      </button>
       <button class="icon-btn toggle" id="pb-loop" title="Boucle">
         <svg viewBox="0 0 24 24"><path d="M17 2l3 3-3 3"/><path d="M4 11V9a4 4 0 0 1 4-4h12M7 22l-3-3 3-3"/><path d="M20 13v2a4 4 0 0 1-4 4H4"/></svg>
       </button>
@@ -120,6 +126,7 @@
         <button data-f="all" class="on">Tous</button>
         <button data-f="missing">Incomplets</button>
       </div>
+      <button class="btn sm" id="dr-add-event" title="Créer un évènement à la tête de lecture">＋ Évènement</button>
       <button class="btn sm" id="dr-import" title="Importer une trace GPX ou un fichier JSON">Importer…</button>
       <button class="btn sm" id="dr-export" title="Télécharger replay.json">Exporter</button>
     </div>
@@ -184,6 +191,7 @@
   <script src="js/timeline.js"></script>
   <script src="js/player.js"></script>
   <script src="js/panels.js"></script>
+  <script src="js/events.js"></script>
   <script src="js/editor.js"></script>
   <script src="js/app.js"></script>
 </body>

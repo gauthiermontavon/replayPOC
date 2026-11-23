@@ -5,6 +5,7 @@ Historique :
 - ✅ v2 — une caméra peut aussi contenir des images (captures d'écran de ses vidéos), traitées comme des séquences (commit 150f451).
 - ✅ v3 — ergonomie du gestionnaire de médias (voir plus bas).
 - ✅ v3.1 — aperçu isolé depuis le tiroir (voir plus bas).
+- ✅ v4 — évènements : descriptions de scène datées (voir plus bas).
 
 Décisions :
 - **Format** : liste unique `medias` (vidéos et images mêlées) ; l'ancien champ `videos` est converti automatiquement.
@@ -99,3 +100,51 @@ Décisions :
 - [x] 2. Boutons de la liste et du formulaire (`js/editor.js`)
 - [x] 3. Vérification : aperçu isolé (timeline en pause, aucune autre fenêtre ouverte), boutons, console sans erreur
 - [x] 4. Docs : README.md, CLAUDE.md
+
+---
+
+# v4 — Évènements
+
+Besoin : un évènement est une **description de scène**. Elle s'affiche à un instant de la timeline, reste visible pendant une durée configurable, et un pictogramme la signale sur la timeline.
+
+Décisions (validées) :
+- **Affichage** : un bandeau « sous-titre » centré **au-dessus de la playbar**.
+  - Il montre ⚑, l'heure, le titre, la description et une barre de temps restant.
+  - Les évènements simultanés s'empilent (3 visibles, puis « +n »).
+  - Un clic sur le bandeau ouvre l'évènement dans l'éditeur.
+- **Position** : facultative. Si elle est définie, un repère ⚑ apparaît sur la carte et devient actif pendant l'affichage.
+- **Durée par défaut** : 15 s, modifiable pour chaque évènement.
+
+Format (au premier niveau de `replay.json`) :
+```json
+{ "id": "evt-1", "type": "event", "title": "Arrivée du bus",
+  "description": "Le bus 11739 s'arrête devant la gare…",
+  "time": "2026-08-24T14:31:05Z", "duration": 15,
+  "position": { "lat": 47.124, "lon": 7.458 } }
+```
+Manquants signalés : `time` et `description`. La position n'est jamais exigée.
+
+## Étapes
+- [x] 1. Modèle (`js/model.js`)
+  - [x] type `event` dans `compute()` (`tStart`/`tEnd` ; `position` facultative ; `offset`)
+  - [x] `M.createEvent(props)`, `M.remove(id)` (évènements uniquement), libellés
+- [x] 2. Bandeau (`js/events.js`, nouveau, chargé après `panels`)
+  - [x] cartes à l'entrée et à la sortie (`media:enter` / `media:exit`), progression sur `tick`
+  - [x] pile de 3 cartes et « +n », clic → éditeur
+  - [x] HTML et CSS, mobile
+- [x] 3. Timeline : lane « Évènements » en haut (pictogramme ⚑ et barre de durée, infobulle titre + description, couleur `--event`), vue d'ensemble
+- [x] 4. Carte : repère ⚑ si une position est définie (icône `event`)
+- [x] 5. Éditeur
+  - [x] lignes ⚑ dans la liste
+  - [x] formulaire : titre, description, instant + « Tête de lecture », durée, position facultative, « Aller à l'évènement », « Supprimer »
+  - [x] bouton « ＋ Évènement » (tiroir) et bouton ⚑+ dans la playbar (raccourci E) pour créer un évènement à la tête de lecture
+- [x] 6. Démo : 2 évènements dans `medias/replay.json`
+- [x] 7. Vérification
+  - [x] le bandeau apparaît et disparaît aux bons instants, y compris après un saut
+  - [x] empilement
+  - [x] repère sur la carte
+  - [x] création, édition, suppression et sauvegarde
+  - [x] console sans erreur
+- [x] 8. Docs : README.md, CLAUDE.md (dont l'ordre de chargement des scripts)
+
+Note de vérification : le bandeau est centré dans l'espace libre entre les outils de la carte et la colonne des vignettes, pour ne pas les chevaucher. Le toast a été déplacé sous la timeline.

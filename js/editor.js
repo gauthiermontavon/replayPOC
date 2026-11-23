@@ -16,6 +16,8 @@
       E.renderList();
     });
     U.$('#dr-export').onclick = () => RP.storage.exportJSON(M.serialize());
+    U.$('#dr-add-event').onclick = () => E.addEvent();
+    U.$('#pb-add-event').onclick = () => E.addEvent();
     U.$('#dr-import').onclick = () => U.$('#import-input').click();
     U.$('#import-input').onchange = async (e) => { await E.importFiles(e.target.files); e.target.value = ''; };
     RP.bus.on('tick', U.throttle(markActive, 400));
@@ -48,6 +50,7 @@
       if (node.type === 'camera') return renderCameraRows(node);
       const it = node;
       const sub = (U.typeLabel[it.type] || it.type) + ' · ' + (it.timed ? U.fmtDateTime(it.tStart) : 'sans date') +
+        (it.type === 'event' && it.timed ? ' · ' + Math.round((it.tEnd - it.tStart) / 1000) + ' s' : '') +
         (it.type === 'moving-object' && it.track ? ' · ' + it.track.length + ' pts' : '') +
         (it.raw.file && !it.file && it.type !== 'moving-object' ? ' · fichier absent' : '');
       list.append(row(it, it.type, it.name, sub, warnEl(it)));
@@ -93,6 +96,12 @@
       const b = U.el('button', { class: 'row-play pill ' + node.type, type: 'button',
         title: img ? 'Voir cette image seule' : 'Lire cette séquence seule (hors timeline)', text: img ? '👁 Voir' : '▶ Lire' });
       b.addEventListener('click', (e) => { e.stopPropagation(); E.play(node.id); });
+      return b;
+    }
+    if (node.type === 'event') {
+      if (!node.timed) return null;
+      const b = U.el('button', { class: 'row-play pill event', type: 'button', title: 'Aller à l\'évènement sur la timeline', text: '⚑ Aller' });
+      b.addEventListener('click', (e) => { e.stopPropagation(); RP.player.seek(node.tStart); });
       return b;
     }
     if (!node.timed) return null;
@@ -333,6 +342,57 @@
     if (cam.missing.includes('position')) U.$$('.fld[data-k="position"]', form).forEach(x => x.classList.add('miss'));
   }
 
+  /** Formulaire d'un évènement (description de scène). */
+  function renderEventForm(it) {
+    const r = it.raw;
+    form.append(
+      U.el('h3', {}, [document.createTextNode('Évènement')]),
+      U.el('div', { class: 'file', text: it.timed ? 'Affiché de ' + U.fmtTime(it.tStart) + ' à ' + U.fmtTime(it.tEnd) : 'Sans date : non affiché' })
+    );
+    const title = inp({ type: 'text', value: r.title || '', placeholder: 'Titre court (ex. Arrivée du bus)' });
+    form.append(field('title', 'Titre', title));
+    const desc = U.el('textarea', { rows: '5', placeholder: 'Description de la scène…' });
+    desc.value = r.description || '';
+    form.append(field('description', 'Description', desc));
+    const time = inp({ type: 'datetime-local', step: '1', value: U.toLocalInput(U.parseTime(r.time)) });
+    form.append(field('time', 'Instant d\'apparition', time, U.tzLabel()));
+    form.append(U.el('div', { class: 'ed-btns' }, [
+      U.el('button', { class: 'btn sm', type: 'button', text: '⟵ Tête de lecture', title: 'Utiliser l\'instant courant de la timeline', onclick: () => {
+        if (RP.player.t != null) apply({ time: U.iso(Math.round((RP.player.t - (+r.offset || 0) * 1000) / 1000) * 1000) }, null);
+      } })
+    ]));
+    const dur = inp({ type: 'number', step: '1', min: '1', value: r.duration != null ? r.duration : '', placeholder: String(M.DEFAULT_EVENT_DURATION) });
+    form.append(field('duration', 'Durée d\'affichage (s)', dur));
+    form.append(U.el('div', { class: 'ed-note', text: 'Position facultative : si elle est définie, un repère ⚑ apparaît sur la carte pendant l\'affichage.' }));
+    positionBlock(it, { tag: 'facultative' }).forEach(x => form.append(x));
+    form.append(U.el('div', { class: 'ed-btns' }, [
+      it.timed ? U.el('button', { class: 'btn sm primary', type: 'button', text: '⚑ Aller à l\'évènement', onclick: () => RP.player.seek(it.tStart) }) : null,
+      U.el('button', { class: 'btn sm danger', type: 'button', text: 'Supprimer l\'évènement', onclick: () => {
+        if (!confirm('Supprimer l\'évènement « ' + it.name + ' » ?')) return;
+        M.remove(it.id);
+        E.deselect();
+        U.toast('Évènement supprimé');
+      } })
+    ]));
+    title.onchange = () => apply({ title: title.value.trim() || null }, null);
+    desc.onchange = () => apply({ description: desc.value.trim() || null }, null);
+    time.onchange = () => { const t = U.fromLocalInput(time.value); apply({ time: t != null ? U.iso(t) : null }, null); };
+    dur.onchange = () => apply({ duration: num(dur.value) }, null);
+    it.missing.forEach(k => U.$$('.fld[data-k="' + k + '"]', form).forEach(x => x.classList.add('miss')));
+  }
+
+  /** Crée un évènement à la tête de lecture et l'ouvre dans l'éditeur (titre sélectionné pour saisie). */
+  E.addEvent = function () {
+    if (!RP.app.loaded) { U.toast('Ouvrez d\'abord un dossier de médias'); return; }
+    const t = RP.player.t != null ? RP.player.t : Date.now();
+    RP.player.pause();
+    const it = M.createEvent(t);
+    E.select(it.id, { noPan: true });
+    const ti = form.querySelector('.fld[data-k="title"] input');
+    if (ti) { ti.focus(); ti.select(); }
+    U.toast('Évènement créé à ' + U.fmtTime(it.tStart));
+  };
+
   function renderForm() {
     const it = M.get(E.selected);
     if (!it) { form.hidden = true; return; }
@@ -340,6 +400,7 @@
     form.innerHTML = '';
     form.append(U.el('button', { class: 'icon-btn sm ed-close', type: 'button', title: 'Fermer le détail', text: '✕', onclick: () => E.deselect() }));
     if (it.type === 'camera') return renderCameraForm(it);
+    if (it.type === 'event') return renderEventForm(it);
     const r = it.raw, src = (r.meta && r.meta.source) || {};
     const srcTxt = Object.keys(src).map(k => (M.missingLabels[k] || k) + ' : ' + src[k]).join(' · ');
     const cam = it.camera;

@@ -16,6 +16,7 @@
     RP.timeline.init();
     RP.player.init();
     RP.panels.init();
+    RP.events.init();
     RP.editor.init();
 
     U.$('#btn-fit').onclick = () => RP.mapview.fitAll();

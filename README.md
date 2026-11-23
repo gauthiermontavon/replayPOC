@@ -19,9 +19,14 @@ Copiez le dossier entier sur une clé USB et double-cliquez sur **`index.html`**
      est mise en pause et aucun autre média ne s'enchaîne (Échap ou ✕ pour fermer). ✕ en haut à droite du détail le referme.
 4. Lecture : les fenêtres vidéo/photo **s'ouvrent automatiquement à leur début et se ferment à leur fin**.
    📌 épingle une fenêtre, ✕ la ferme jusqu'au prochain passage ; glisser l'en-tête la détache (double-clic pour la réancrer).
+5. **Évènements** : un évènement est une description de scène datée.
+   - Affichage : un bandeau au-dessus de la playbar, pendant sa durée (15 s par défaut). Plusieurs évènements simultanés s'empilent ; un clic ouvre l'évènement dans l'éditeur.
+   - Timeline : ⚑ sur la ligne « Évènements ».
+   - Carte : si une position est définie, un repère ⚑ apparaît.
+   - Création, à la tête de lecture : bouton ⚑+ de la playbar, touche **E** ou « ＋ Évènement » dans le tiroir. On les modifie ou supprime dans l'éditeur.
 
 **Raccourcis** : Espace lecture/pause · ←/→ ±10 s · Maj+←/→ évènement précédent/suivant · +/− zoom timeline ·
-`,` / `.` vitesse · M son · Origine/Fin.
+`,` / `.` vitesse · M son · E nouvel évènement · Origine/Fin.
 **Timeline** : molette = zoom, glisser = déplacer, clic = aller à l'instant, double-clic = toute la période.
 
 ## Navigateurs
@@ -51,6 +56,9 @@ Tableau d'objets ; champs optionnels ajoutés par l'application en *italique* :
       { "type": "image", "id": "camera-01-c1", "file": "camera-01/capture-143045.jpg", "time": "2026-08-24T14:30:45Z", "display": 8 },
       { "type": "video", "id": "camera-01-2", "file": "camera-01/seq2.mp4", "start": "2026-08-24T14:33:00Z", "duration": 45,
         "position": { "lat": 47.124, "lon": 7.457 } } ] },
+  { "id": "evt-croisement", "type": "event", "title": "Croisement",
+    "description": "Le véhicule A croise un piéton au niveau du passage.",
+    "time": "2026-08-24T14:30:40Z", "duration": 20, "position": { "lat": 47.1235, "lon": 7.457 } },
   { "id": "photo-17", "type": "image", "time": "2026-08-24T14:32:14Z",
     "position": { "lat": 47.125, "lon": 7.461 }, "file": "photo-17.jpg", "display": 10 }
 ]

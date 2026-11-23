@@ -8,6 +8,7 @@
     .concat([1, 2, 5, 10, 15, 30].map(m => m * MIN))
     .concat([1, 2, 3, 6, 12].map(h => h * HOUR)).concat([DAY, 2 * DAY, 7 * DAY]);
   const LANES = [
+    { type: 'event', label: 'Évènements', color: '--event' },
     { type: 'moving-object', label: 'Objets', color: '--moving' },
     { type: 'video', label: 'Vidéos', color: '--video' },
     { type: 'image', label: 'Photos', color: '--image' }
@@ -49,7 +50,7 @@
 
   function readColors() {
     const s = getComputedStyle(document.documentElement);
-    ['--moving', '--video', '--image', '--text', '--muted', '--border', '--accent', '--warn', '--surface-2', '--accent-soft'].forEach(k => colors[k] = s.getPropertyValue(k).trim());
+    ['--event', '--moving', '--video', '--image', '--text', '--muted', '--border', '--accent', '--warn', '--surface-2', '--accent-soft'].forEach(k => colors[k] = s.getPropertyValue(k).trim());
   }
 
   function resize() {
@@ -205,7 +206,19 @@
           if (x2 < -10 || x1 > W + 10) return;
           const active = tNow != null && it.tStart <= tNow && tNow < it.tEnd;
           const hov = hover && hover.item === it;
-          if (it.type === 'image') {
+          if (it.type === 'event') {
+            // Pictogramme ⚑ à l'instant de l'évènement + durée d'affichage en fond
+            ctx.fillStyle = c; ctx.globalAlpha = active ? 0.32 : 0.16;
+            roundRect(ctx, x1, y + 1, Math.max(2, x2 - x1), rh - 2, 3); ctx.fill();
+            ctx.globalAlpha = 1;
+            drawFlag(ctx, x1, y, rh, c, hov || active);
+            if (it.missing.length) { ctx.fillStyle = colors['--warn']; ctx.beginPath(); ctx.arc(x1 + 9, y + 3, 2.5, 0, Math.PI * 2); ctx.fill(); }
+            if (x2 - x1 > 60 && rh >= 11) {
+              ctx.save(); ctx.beginPath(); ctx.rect(x1 + 12, y, Math.min(x2, W) - x1 - 14, rh); ctx.clip();
+              ctx.fillStyle = colors['--text']; ctx.font = '600 10px system-ui, sans-serif'; ctx.textAlign = 'left';
+              ctx.fillText(it.name, x1 + 13, y + rh / 2 + 0.5); ctx.restore();
+            }
+          } else if (it.type === 'image') {
             // Losange au moment de la prise + zone d'affichage discrète
             const ci = colors['--image']; // captures de caméra et photos : même couleur
             ctx.fillStyle = ci; ctx.globalAlpha = 0.18;
@@ -269,7 +282,7 @@
     LANES.forEach((l, i) => {
       octx.fillStyle = colors[l.color]; octx.globalAlpha = 0.7;
       M.timed().filter(it => it.type === l.type).forEach(it => {
-        octx.fillRect(ox(it.tStart), 2 + i * (OH - 4) / 3, Math.max(1.5, ox(it.tEnd) - ox(it.tStart)), (OH - 4) / 3 - 1);
+        octx.fillRect(ox(it.tStart), 2 + i * (OH - 4) / LANES.length, Math.max(1.5, ox(it.tEnd) - ox(it.tStart)), (OH - 4) / LANES.length - 1);
       });
     });
     octx.globalAlpha = 1;
@@ -283,6 +296,15 @@
       octx.fillStyle = colors['--accent'];
       octx.fillRect(U.clamp(ox(tNow), 0, OW) - 1, 0, 2, OH);
     }
+  }
+
+  /** Petit drapeau (pictogramme d'évènement) : mât à l'instant t, fanion à droite. */
+  function drawFlag(c, x0, y, h, color, big) {
+    const top = y + 1, bot = y + h - 1, fh = Math.min(h - 2, big ? 11 : 9), fw = big ? 10 : 8;
+    c.strokeStyle = color; c.lineWidth = big ? 2 : 1.6;
+    c.beginPath(); c.moveTo(Math.round(x0) + 0.5, top); c.lineTo(Math.round(x0) + 0.5, bot); c.stroke();
+    c.fillStyle = color;
+    c.beginPath(); c.moveTo(x0 + 1, top); c.lineTo(x0 + fw, top + fh * 0.3); c.lineTo(x0 + 1, top + fh * 0.6); c.closePath(); c.fill();
   }
 
   function roundRect(c, x0, y0, w, h, r) {
@@ -330,18 +352,28 @@
     if ((h && h.item) !== (hover && hover.item)) { hover = h; T.draw(); }
     if (h) {
       const it = h.item;
+      if (it.type === 'event') {
+        tip.innerHTML = '<b>⚑ ' + U.esc(it.name) + '</b> · ' + U.fmtTime(it.tStart) + ' (' + Math.round((it.tEnd - it.tStart) / 1000) + ' s)' +
+          (it.raw.description ? '<br>' + U.esc(String(it.raw.description).slice(0, 220)) + (String(it.raw.description).length > 220 ? '…' : '') : '') +
+          (it.missing.length ? '<br><span style="color:var(--warn)">⚠ Incomplet : ' + it.missing.map(k => M.missingLabels[k] || k).join(', ') + '</span>' : '');
+        positionTip(p);
+        return;
+      }
       const kind = it.camera ? (it.type === 'image' ? 'Capture' : 'Vidéo') + ' — séquence ' + it.seq + '/' + it.camera.medias.length : (U.typeLabel[it.type] || it.type);
       tip.innerHTML = '<b>' + U.esc(it.camera ? it.camera.name : it.name) + '</b><br>' + U.esc(kind) + ' · ' +
         (it.type === 'image' ? U.fmtTime(it.tStart) : U.fmtTime(it.tStart) + ' → ' + U.fmtTime(it.tEnd) + ' (' + U.fmtDuration((it.tEnd - it.tStart) / 1000) + ')') +
         (it.missing.length ? '<br><span style="color:var(--warn)">⚠ Incomplet : ' + it.missing.map(k => M.missingLabels[k] || k).join(', ') + '</span>' : '');
-      tip.hidden = false;
-      const tlr = U.$('#timeline').getBoundingClientRect(), cr = cv.getBoundingClientRect();
-      const tw = tip.offsetWidth;
-      tip.style.left = U.clamp(cr.left - tlr.left + p.x - tw / 2, 4, tlr.width - tw - 4) + 'px';
-      tip.style.top = (cr.top - tlr.top + H + 8) + 'px';
+      positionTip(p);
     } else {
       tip.hidden = true;
     }
+  }
+  function positionTip(p) {
+    tip.hidden = false;
+    const tlr = U.$('#timeline').getBoundingClientRect(), cr = cv.getBoundingClientRect();
+    const tw = tip.offsetWidth;
+    tip.style.left = U.clamp(cr.left - tlr.left + p.x - tw / 2, 4, tlr.width - tw - 4) + 'px';
+    tip.style.top = (cr.top - tlr.top + H + 8) + 'px';
   }
   function onUp(e) {
     if (!drag) return;

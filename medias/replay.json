@@ -247,5 +247,25 @@
         }
       }
     ]
+  },
+  {
+    "id": "evt-depart",
+    "type": "event",
+    "title": "Départ du véhicule A",
+    "description": "Le véhicule A quitte le parking et s'engage sur la route principale, visible par la caméra 01.",
+    "time": "2026-08-24T14:30:05Z",
+    "duration": 15,
+    "position": {
+      "lat": 47.1235,
+      "lon": 7.457
+    }
+  },
+  {
+    "id": "evt-croisement",
+    "type": "event",
+    "title": "Croisement",
+    "description": "Le véhicule A croise un piéton au niveau du passage. Capture prise par la caméra 01.",
+    "time": "2026-08-24T14:30:40Z",
+    "duration": 20
   }
 ]
