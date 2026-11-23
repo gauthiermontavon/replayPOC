@@ -24,6 +24,9 @@ Copiez le dossier entier sur une clé USB et double-cliquez sur **`index.html`**
    - Timeline : ⚑ sur la ligne « Évènements ».
    - Carte : si une position est définie, un repère ⚑ apparaît.
    - Création, à la tête de lecture : bouton ⚑+ de la playbar, touche **E** ou « ＋ Évènement » dans le tiroir. On les modifie ou supprime dans l'éditeur.
+   - **Liens** : un évènement peut être lié à des caméras, objets mobiles ou photos/captures (section « Liés à » de l'éditeur).
+     - Pendant l'affichage, les vignettes liées sont encadrées d'ambre et leur bandeau titre pulse doucement, les repères liés sont cerclés d'ambre, et le bandeau d'évènement liste les éléments liés (clic = centrer la carte).
+     - Une caméra liée met en évidence toutes ses vignettes.
 
 **Raccourcis** : Espace lecture/pause · ←/→ ±10 s · Maj+←/→ évènement précédent/suivant · +/− zoom timeline ·
 `,` / `.` vitesse · M son · E nouvel évènement · Origine/Fin.
@@ -58,7 +61,8 @@ Tableau d'objets ; champs optionnels ajoutés par l'application en *italique* :
         "position": { "lat": 47.124, "lon": 7.457 } } ] },
   { "id": "evt-croisement", "type": "event", "title": "Croisement",
     "description": "Le véhicule A croise un piéton au niveau du passage.",
-    "time": "2026-08-24T14:30:40Z", "duration": 20, "position": { "lat": 47.1235, "lon": 7.457 } },
+    "time": "2026-08-24T14:30:40Z", "duration": 20, "position": { "lat": 47.1235, "lon": 7.457 },
+    "links": ["camera-01-c1", "vehicle-001"] },
   { "id": "photo-17", "type": "image", "time": "2026-08-24T14:32:14Z",
     "position": { "lat": 47.125, "lon": 7.461 }, "file": "photo-17.jpg", "display": 10 }
 ]

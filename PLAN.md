@@ -6,6 +6,7 @@ Historique :
 - ✅ v3 — ergonomie du gestionnaire de médias (voir plus bas).
 - ✅ v3.1 — aperçu isolé depuis le tiroir (voir plus bas).
 - ✅ v4 — évènements : descriptions de scène datées (voir plus bas).
+- ✅ v4.1 — liens entre un évènement et des caméras, objets ou photos, avec mise en évidence (voir plus bas).
 
 Décisions :
 - **Format** : liste unique `medias` (vidéos et images mêlées) ; l'ancien champ `videos` est converti automatiquement.
@@ -148,3 +149,41 @@ Manquants signalés : `time` et `description`. La position n'est jamais exigée.
 - [x] 8. Docs : README.md, CLAUDE.md (dont l'ordre de chargement des scripts)
 
 Note de vérification : le bandeau est centré dans l'espace libre entre les outils de la carte et la colonne des vignettes, pour ne pas les chevaucher. Le toast a été déplacé sous la timeline.
+
+---
+
+# v4.1 — Lier un évènement à des caméras, objets ou photos
+
+Besoin : un évènement peut être lié à une ou plusieurs caméras, objets mobiles ou photos (y compris les captures de caméra). Quand l'évènement devient actif :
+- la vignette correspondante est mise en évidence, par un **clignotement doux du bandeau titre** qui attire l'attention sans agresser ;
+- le repère correspondant sur la carte est mis en évidence lui aussi.
+
+Décisions :
+- **Format** : `"links": ["camera-01", "vehicle-001", "photo-17"]`, une liste d'ids sur l'évènement. Un lien vers un id disparu est ignoré à l'affichage, mais signalé dans l'éditeur.
+- **Cible** : une caméra englobe toutes ses vignettes, vidéo et captures. Un objet mobile n'a pas de vignette, donc seul son repère est mis en évidence.
+- **Effet** :
+  - en-tête de la vignette : pulsation ambre (couleur des évènements) de 1,6 s en boucle, douce ;
+  - repère : anneau ambre pulsant et libellé visible ;
+  - l'effet dure tant qu'au moins un évènement lié est actif ;
+  - `prefers-reduced-motion` : mise en évidence fixe, sans animation.
+- **Bandeau d'évènement** : il affiche aussi les éléments liés sous forme de pastilles. Un clic sur une pastille centre la carte sur l'élément.
+- **Éditeur** :
+  - section « Liés à » dans le formulaire d'un évènement : pastilles retirables ✕, et menu « ＋ Lier… » groupé (Caméras / Objets / Photos et captures) ;
+  - dans la liste, la ligne de l'évènement indique le nombre de liens.
+
+## Étapes
+- [x] 1. Modèle : `it.links` (ids valides), `M.linkTargets()`, sérialisation
+- [x] 2. Mise en évidence
+  - [x] `events.js` calcule l'ensemble des ids mis en évidence et émet `highlight`
+  - [x] `panels.js` : classe `linked` sur les vignettes (aussi à l'ouverture)
+  - [x] `map.js` : classe `linked` sur les repères
+  - [x] CSS des animations
+- [x] 3. Éditeur : section « Liés à » ; nombre de liens dans la liste ; pastilles dans le bandeau
+- [x] 4. Démo : liens sur les deux évènements de `medias/replay.json`
+- [x] 5. Vérification
+  - [x] mise en évidence au début, retrait à la fin, y compris après un saut
+  - [x] caméra → toutes ses vignettes
+  - [x] repères
+  - [x] ajout et retrait de liens, sauvegarde
+  - [x] console sans erreur
+- [x] 6. Docs : README.md, CLAUDE.md

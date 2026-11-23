@@ -258,7 +258,11 @@
     "position": {
       "lat": 47.1235,
       "lon": 7.457
-    }
+    },
+    "links": [
+      "camera-01",
+      "vehicle-001"
+    ]
   },
   {
     "id": "evt-croisement",
@@ -266,6 +270,10 @@
     "title": "Croisement",
     "description": "Le véhicule A croise un piéton au niveau du passage. Capture prise par la caméra 01.",
     "time": "2026-08-24T14:30:40Z",
-    "duration": 20
+    "duration": 20,
+    "links": [
+      "camera-01-c1",
+      "vehicle-001"
+    ]
   }
 ]

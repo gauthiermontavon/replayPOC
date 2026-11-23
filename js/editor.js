@@ -51,6 +51,7 @@
       const it = node;
       const sub = (U.typeLabel[it.type] || it.type) + ' · ' + (it.timed ? U.fmtDateTime(it.tStart) : 'sans date') +
         (it.type === 'event' && it.timed ? ' · ' + Math.round((it.tEnd - it.tStart) / 1000) + ' s' : '') +
+        (it.type === 'event' && M.linksOf(it).length ? ' · 🔗 ' + M.linksOf(it).length : '') +
         (it.type === 'moving-object' && it.track ? ' · ' + it.track.length + ' pts' : '') +
         (it.raw.file && !it.file && it.type !== 'moving-object' ? ' · fichier absent' : '');
       list.append(row(it, it.type, it.name, sub, warnEl(it)));
@@ -354,6 +355,7 @@
     const desc = U.el('textarea', { rows: '5', placeholder: 'Description de la scène…' });
     desc.value = r.description || '';
     form.append(field('description', 'Description', desc));
+    linksBlock(it).forEach(x => form.append(x));
     const time = inp({ type: 'datetime-local', step: '1', value: U.toLocalInput(U.parseTime(r.time)) });
     form.append(field('time', 'Instant d\'apparition', time, U.tzLabel()));
     form.append(U.el('div', { class: 'ed-btns' }, [
@@ -379,6 +381,48 @@
     time.onchange = () => { const t = U.fromLocalInput(time.value); apply({ time: t != null ? U.iso(t) : null }, null); };
     dur.onchange = () => apply({ duration: num(dur.value) }, null);
     it.missing.forEach(k => U.$$('.fld[data-k="' + k + '"]', form).forEach(x => x.classList.add('miss')));
+  }
+
+  /**
+   * Section « Liés à » d'un évènement : pastilles retirables + menu « ＋ Lier… » (caméras, objets, photos et captures).
+   * Les éléments liés sont mis en évidence (vignette + repère) pendant l'affichage de l'évènement.
+   */
+  function linksBlock(it) {
+    const ids = (it.raw.links || []).slice();
+    const save = (next) => apply({ links: next.length ? next : null }, null, it.id);
+    const chips = U.el('div', { class: 'link-chips' });
+    ids.forEach(id => {
+      const n = M.get(id);
+      const ok = n && n.type !== 'event' && n.type !== 'video';
+      const chip = U.el('span', { class: 'link-chip ' + (ok ? n.type : 'lost'), title: ok ? 'Afficher dans l\'éditeur' : 'Élément introuvable (supprimé ou renommé)' }, [
+        U.el('span', { class: 'ic', html: ok ? (U.icons[n.type === 'camera' ? 'video' : n.type] || U.icons.pin) : '⚠' }),
+        U.el('span', { class: 'nm', text: ok ? RP.events.labelOf(n) : id }),
+        U.el('button', { type: 'button', title: 'Retirer ce lien', text: '✕', onclick: (e) => { e.stopPropagation(); save(ids.filter(x => x !== id)); } })
+      ]);
+      if (ok) chip.addEventListener('click', () => E.select(n.id));
+      chips.append(chip);
+    });
+    if (!ids.length) chips.append(U.el('span', { class: 'ed-note', text: 'Aucun lien : seul le bandeau s\'affiche.' }));
+
+    const sel = U.el('select', { class: 'sel-input' });
+    sel.append(U.el('option', { value: '', text: '＋ Lier une caméra, un objet ou une photo…' }));
+    const T = M.linkTargets();
+    const group = (label, nodes) => {
+      const free = nodes.filter(n => !ids.includes(n.id));
+      if (!free.length) return;
+      const g = U.el('optgroup', { label });
+      free.forEach(n => g.append(U.el('option', { value: n.id, text: RP.events.labelOf(n) })));
+      sel.append(g);
+    };
+    group('Caméras', T.cameras);
+    group('Objets mobiles', T.objects);
+    group('Photos et captures', T.images);
+    sel.onchange = () => { if (sel.value) save(ids.concat(sel.value)); };
+
+    return [
+      U.el('div', { class: 'fld', 'data-k': 'links' }, [U.el('span', {}, [U.el('b', { text: 'Liés à' }), U.el('em', { text: 'mis en évidence pendant l\'affichage' })]), chips]),
+      U.el('div', { class: 'fld' }, [sel])
+    ];
   }
 
   /** Crée un évènement à la tête de lecture et l'ouvre dans l'éditeur (titre sélectionné pour saisie). */

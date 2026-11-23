@@ -29,6 +29,7 @@
       else PN.close(keyOf(it));
     });
     RP.bus.on('tick', onTick);
+    RP.bus.on('highlight', () => wins.forEach(applyHighlight));
     RP.bus.on('mute', m => wins.forEach(w => { if (w.video) w.video.muted = m; }));
     const lb = U.$('#lightbox');
     lb.addEventListener('click', () => { lb.hidden = true; lb.querySelector('img').removeAttribute('src'); });
@@ -92,10 +93,17 @@
     return Array.from(dock.children).find(c => { const o = wins.get(c.dataset.id); return o && o.item && o.item.tStart > t; }) || null;
   }
 
+  /** Vignette liée à un évènement actif : bandeau titre qui clignote doucement (classe `linked`). */
+  function applyHighlight(w) {
+    const hl = RP.events && RP.events.highlight;
+    w.el.classList.toggle('linked', !!(hl && w.item && hl.has(w.item.id)));
+  }
+
   /** Affiche un média (ou une séquence) dans la fenêtre ; réutilise l'élément <video> d'une caméra. */
   function setContent(w, it) {
     const prevUrl = w.url;
     w.item = it;
+    if (w.el) applyHighlight(w);
     w.url = it.file ? URL.createObjectURL(it.file) : null;
     w.forceSync = true;
     w.title.textContent = titleOf(it);

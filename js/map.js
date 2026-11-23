@@ -21,6 +21,8 @@
     });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && pickResolve) { const r = pickResolve; endPick(); r(null); } });
     map.on('dragstart', () => { if (V.follow) V.setFollow(false); });
+    // Évènement actif : mise en évidence des repères liés
+    RP.bus.on('highlight', () => { if (RP.player) V.update(RP.player.t, RP.player.activeIds); });
   };
 
   function iconFor(type, label, count) {
@@ -134,6 +136,15 @@
     V.select(selectedId);
   };
 
+  /** Repère lié à un évènement actif (caméra, groupe de médias, photo ou objet mobile). */
+  function isLinked(m) {
+    const hl = RP.events && RP.events.highlight;
+    if (!hl || !hl.size) return false;
+    if (hl.has(m.node.id)) return true;
+    for (const id of m.ids) if (hl.has(id)) return true;
+    return false;
+  }
+
   function isSelected(m) {
     return selectedId != null && (m.ids.has(selectedId) || m.node.id === selectedId);
   }
@@ -145,7 +156,8 @@
       let active = false;
       if (activeIds) m.ids.forEach(id => { if (activeIds.has(id)) active = true; });
       const sel = isSelected(m);
-      const state = (active ? 'active' : 'inactive') + (sel ? ' selected' : '');
+      const linked = isLinked(m);
+      const state = (active ? 'active' : 'inactive') + (sel ? ' selected' : '') + (linked ? ' linked' : '');
       if (state !== m.state || force) {
         m.state = state;
         const el = m.marker.getElement();
@@ -153,8 +165,9 @@
           el.classList.toggle('active', active);
           el.classList.toggle('inactive', !active);
           el.classList.toggle('selected', sel);
+          el.classList.toggle('linked', linked);
         }
-        m.marker.setZIndexOffset(active ? 1000 : sel ? 500 : 0);
+        m.marker.setZIndexOffset(linked ? 1500 : active ? 1000 : sel ? 500 : 0);
       }
       if (it.type === 'moving-object' && it.track && it.track.length) {
         const p = M.positionAt(it, t);

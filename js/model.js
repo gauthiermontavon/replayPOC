@@ -64,6 +64,8 @@
       if (!String(r.description || '').trim()) it.missing.push('description');
       const dur = U.isNum(+r.duration) && +r.duration > 0 ? +r.duration : DEFAULT_EVENT_DURATION;
       if (s != null) { it.tStart = s + off; it.tEnd = it.tStart + dur * 1000; }
+      // Liens vers des caméras, objets mobiles ou photos (ids) ; les ids disparus sont filtrés à l'usage (M.linksOf)
+      it.links = Array.isArray(r.links) ? r.links.filter(x => typeof x === 'string' && x) : [];
     } else if (r.type === 'moving-object') {
       const pts = (Array.isArray(r.track) ? r.track : [])
         .map(p => ({ t: U.parseTime(p.time), lat: +p.lat, lon: +p.lon }))
@@ -281,6 +283,33 @@
     cam.medias = cam.medias.filter(x => x !== it);
     it.camera = null;
   }
+
+  /** Éléments qu'un évènement peut lier : caméras, objets mobiles, photos (indépendantes ou captures). */
+  M.linkTargets = function () {
+    return {
+      cameras: M.cameras(),
+      objects: M.roots.filter(n => n.type === 'moving-object'),
+      images: M.items.filter(i => i.type === 'image')
+    };
+  };
+
+  /** Nœuds existants liés à un évènement (les ids disparus sont ignorés). */
+  M.linksOf = function (evt) {
+    return (evt && evt.links || []).map(id => M.byId.get(id)).filter(n => n && n.type !== 'event' && n.type !== 'video');
+  };
+
+  /**
+   * Ids à mettre en évidence pour un ensemble de nœuds liés :
+   * une caméra englobe tous ses médias (vignette vidéo + captures).
+   */
+  M.expandLinks = function (nodes) {
+    const out = new Set();
+    nodes.forEach(n => {
+      out.add(n.id);
+      if (n.type === 'camera') n.medias.forEach(m => out.add(m.id));
+    });
+    return out;
+  };
 
   /** Crée un évènement (description de scène) à l'instant `t` (ms). Émet model:rebuilt. */
   M.createEvent = function (t, props) {
