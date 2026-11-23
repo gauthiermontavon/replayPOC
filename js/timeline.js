@@ -70,12 +70,13 @@
     rows = {};
     LANES.forEach(l => {
       if (l.type === 'video') {
-        // Une ligne par caméra : toutes ses séquences sur la même ligne
+        // Une ligne par caméra : toutes ses séquences (vidéos, puis captures dessinées par-dessus) sur la même ligne
         rows.video = M.cameras().filter(c => c.timed).sort((a, b) => a.tStart - b.tStart)
-          .map(c => c.videos.filter(v => v.timed));
+          .map(c => c.videos.filter(v => v.timed).concat(c.images.filter(v => v.timed)));
         return;
       }
-      const items = M.timed().filter(i => i.type === l.type).sort((a, b) => a.tStart - b.tStart);
+      // Lane Photos : uniquement les photos indépendantes (les captures sont sur la ligne de leur caméra)
+      const items = M.timed().filter(i => i.type === l.type && !i.camera).sort((a, b) => a.tStart - b.tStart);
       const rr = [];
       items.forEach(it => {
         let row = rr.find(r => r[r.length - 1].tEnd <= it.tStart);
@@ -133,7 +134,7 @@
   /** Libellé d'une barre : nom de la caméra (+ n° de séquence) ou du média. */
   function labelOf(it) {
     if (!it.camera) return it.name;
-    return it.camera.videos.length > 1 ? it.camera.name + ' · séq. ' + it.seq : it.camera.name;
+    return it.camera.medias.length > 1 ? it.camera.name + ' · séq. ' + it.seq : it.camera.name;
   }
 
   function laneLayout() {
@@ -206,12 +207,13 @@
           const hov = hover && hover.item === it;
           if (it.type === 'image') {
             // Losange au moment de la prise + zone d'affichage discrète
-            ctx.fillStyle = c; ctx.globalAlpha = 0.18;
+            const ci = colors['--image']; // captures de caméra et photos : même couleur
+            ctx.fillStyle = ci; ctx.globalAlpha = 0.18;
             roundRect(ctx, x1, y + 1, Math.max(2, x2 - x1), rh - 2, 3); ctx.fill();
             ctx.globalAlpha = 1;
             const s = Math.min(rh / 2 - 1, 6) + (hov || active ? 1.5 : 0);
             ctx.beginPath(); ctx.moveTo(x1, y + rh / 2 - s); ctx.lineTo(x1 + s, y + rh / 2); ctx.lineTo(x1, y + rh / 2 + s); ctx.lineTo(x1 - s, y + rh / 2); ctx.closePath();
-            ctx.fillStyle = c; ctx.fill();
+            ctx.fillStyle = ci; ctx.fill();
             if (active) { ctx.strokeStyle = colors['--text']; ctx.lineWidth = 1.2; ctx.stroke(); }
           } else {
             ctx.fillStyle = c;
@@ -328,7 +330,7 @@
     if ((h && h.item) !== (hover && hover.item)) { hover = h; T.draw(); }
     if (h) {
       const it = h.item;
-      const kind = it.camera ? 'Vidéo — séquence ' + it.seq + '/' + it.camera.videos.length : (U.typeLabel[it.type] || it.type);
+      const kind = it.camera ? (it.type === 'image' ? 'Capture' : 'Vidéo') + ' — séquence ' + it.seq + '/' + it.camera.medias.length : (U.typeLabel[it.type] || it.type);
       tip.innerHTML = '<b>' + U.esc(it.camera ? it.camera.name : it.name) + '</b><br>' + U.esc(kind) + ' · ' +
         (it.type === 'image' ? U.fmtTime(it.tStart) : U.fmtTime(it.tStart) + ' → ' + U.fmtTime(it.tEnd) + ' (' + U.fmtDuration((it.tEnd - it.tStart) / 1000) + ')') +
         (it.missing.length ? '<br><span style="color:var(--warn)">⚠ Incomplet : ' + it.missing.map(k => M.missingLabels[k] || k).join(', ') + '</span>' : '');

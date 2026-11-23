@@ -1,8 +1,9 @@
-/* Modèle de données : caméras (conteneurs de 1..n vidéos), photos, objets mobiles + champs calculés
+/* Modèle de données : caméras (conteneurs de 1..n médias : vidéos et captures), photos, objets mobiles
  *
- *  M.roots : nœuds de premier niveau, dans l'ordre du JSON (caméras, images, objets mobiles) → serialize()
+ *  M.roots : nœuds de premier niveau, dans l'ordre du JSON (caméras, images indépendantes, objets mobiles) → serialize()
  *  M.items : liste PLATE des éléments jouables (vidéos, images, objets mobiles) → player, timeline, panels
- *  Une vidéo pointe vers son conteneur via item.camera ; item.seq = rang chronologique (1..n) dans la caméra.
+ *  Un média de caméra pointe vers son conteneur via item.camera ; item.seq = rang chronologique (1..n) parmi
+ *  tous les médias de la caméra (vidéos et captures numérotées ensemble).
  */
 (function () {
   'use strict';
@@ -33,12 +34,14 @@
     it.pos = own;
     it.track = null;
     it.tStart = it.tEnd = null;
+    const cam = it.camera;
+    if (cam) {
+      // Média de caméra — position effective : imposée par la caméra, sinon propre, sinon héritée de la caméra
+      it.pos = cam.applyPosition && cam.pos ? cam.pos : (own || cam.pos || null);
+    }
+    it.posFrom = !it.pos ? null : it.pos === own ? 'own' : 'camera';
 
     if (r.type === 'video') {
-      const cam = it.camera;
-      // Position effective : imposée par la caméra, sinon propre, sinon héritée de la caméra
-      it.pos = cam && cam.applyPosition && cam.pos ? cam.pos : (own || (cam && cam.pos) || null);
-      it.posFrom = it.pos === own && own ? 'video' : it.pos ? 'camera' : null;
       const s = U.parseTime(r.start);
       if (s == null) it.missing.push('start');
       if (!it.pos) it.missing.push('position');
@@ -68,7 +71,7 @@
     return it;
   }
 
-  /** Recalcule une caméra puis toutes ses vidéos (position effective, ordre des séquences, manques agrégés). */
+  /** Recalcule une caméra puis tous ses médias (position effective, ordre des séquences, manques agrégés). */
   function computeCamera(cam) {
     const r = cam.raw;
     cam.id = r.id;
@@ -76,14 +79,16 @@
     cam.name = r.name || r.id;
     cam.pos = U.validLatLon(r.position) ? { lat: +r.position.lat, lon: +r.position.lon } : null;
     cam.applyPosition = r.applyPosition !== false;
-    cam.videos.forEach(compute);
-    cam.videos.sort((a, b) => (a.tStart == null) - (b.tStart == null) || (a.tStart || 0) - (b.tStart || 0));
-    cam.videos.forEach((v, i) => { v.seq = i + 1; });
+    cam.medias.forEach(compute);
+    cam.medias.sort((a, b) => (a.tStart == null) - (b.tStart == null) || (a.tStart || 0) - (b.tStart || 0));
+    cam.medias.forEach((v, i) => { v.seq = i + 1; });
+    cam.videos = cam.medias.filter(m => m.type === 'video');
+    cam.images = cam.medias.filter(m => m.type === 'image');
     const miss = new Set();
-    cam.videos.forEach(v => v.missing.forEach(k => miss.add(k)));
-    if (!cam.videos.length) miss.add('videos');
+    cam.medias.forEach(v => v.missing.forEach(k => miss.add(k)));
+    if (!cam.medias.length) miss.add('medias');
     cam.missing = Array.from(miss);
-    const timed = cam.videos.filter(v => v.timed);
+    const timed = cam.medias.filter(v => v.timed);
     cam.timed = timed.length > 0;
     cam.tStart = cam.timed ? Math.min(...timed.map(v => v.tStart)) : null;
     cam.tEnd = cam.timed ? Math.max(...timed.map(v => v.tEnd)) : null;
@@ -126,19 +131,21 @@
       if (!camRaw.position) delete camRaw.position;
       delete v.name; delete v.position;
       v.id = (raw.id || 'video') + '-1';
-      camRaw.videos = [v];
+      camRaw.medias = [v];
       raw = camRaw;
     }
 
     if (raw.type === 'camera') {
-      const videos = Array.isArray(raw.videos) ? raw.videos : [];
+      // Format courant : "medias" (vidéos + images) ; ancien format v1 : "videos" (vidéos seules)
+      const medias = (Array.isArray(raw.medias) ? raw.medias : [])
+        .concat((Array.isArray(raw.videos) ? raw.videos : []).map(v => Object.assign({}, v, { type: 'video' })));
       const camRaw = Object.assign({}, raw);
-      delete camRaw.videos;
+      delete camRaw.videos; delete camRaw.medias;
       if (!camRaw.id || M.byId.has(camRaw.id)) camRaw.id = uniqueId(camRaw.id || camRaw.name || 'camera');
-      const cam = { raw: camRaw, videos: [] };
+      const cam = { raw: camRaw, medias: [], videos: [], images: [] };
       M.byId.set(camRaw.id, cam);
       M.roots.push(cam);
-      videos.forEach(v => { if (v && typeof v === 'object') attachVideo(cam, v, resolve(v)); });
+      medias.forEach(m => { if (m && typeof m === 'object') attachMedia(cam, m, resolve(m)); });
       computeCamera(cam);
       return cam;
     }
@@ -151,29 +158,36 @@
     return it;
   };
 
-  function attachVideo(cam, vraw, file) {
-    vraw = Object.assign({}, vraw, { type: 'video' });
-    if (!vraw.id || M.byId.has(vraw.id)) vraw.id = uniqueId(vraw.id || (cam.raw.id + '-' + (cam.videos.length + 1)));
-    const it = { raw: vraw, file: file || null, camera: cam };
-    cam.videos.push(it);
+  /** Type d'un média de caméra : explicite, sinon déduit de l'extension, sinon vidéo. */
+  function mediaType(m) {
+    if (m.type === 'video' || m.type === 'image') return m.type;
+    return RP.metadata && RP.metadata.kindOf(m.file || '') === 'image' ? 'image' : 'video';
+  }
+
+  function attachMedia(cam, mraw, file) {
+    mraw = Object.assign({}, mraw, { type: mediaType(mraw) });
+    if (!mraw.id || M.byId.has(mraw.id)) mraw.id = uniqueId(mraw.id || (cam.raw.id + '-' + (cam.medias.length + 1)));
+    const it = { raw: mraw, file: file || null, camera: cam };
+    cam.medias.push(it);
     M.items.push(it);
-    M.byId.set(vraw.id, it);
+    M.byId.set(mraw.id, it);
     return it;
   }
 
-  /** Ajoute une vidéo brute à une caméra existante. */
-  M.addVideoToCamera = function (cam, vraw, file) {
-    const it = attachVideo(cam, vraw, file);
+  /** Ajoute un média brut (vidéo ou image) à une caméra existante. */
+  M.addMediaToCamera = function (cam, mraw, file) {
+    const it = attachMedia(cam, mraw, file);
     computeCamera(cam);
     return it;
   };
+  M.addVideoToCamera = M.addMediaToCamera; // compatibilité
 
-  /** Crée une caméra vide (sans l'ajouter à l'affichage tant qu'elle n'a pas de vidéo). */
+  /** Crée une caméra vide (sans l'ajouter à l'affichage tant qu'elle n'a pas de média). */
   M.createCamera = function (props) {
     const raw = Object.assign({ type: 'camera' }, props);
     raw.id = uniqueId(raw.id || raw.name || 'camera');
     raw.type = 'camera';
-    const cam = { raw, videos: [] };
+    const cam = { raw, medias: [], videos: [], images: [] };
     M.byId.set(raw.id, cam);
     M.roots.push(cam);
     computeCamera(cam);
@@ -207,33 +221,56 @@
     return node;
   };
 
+  /** Cible « aucune caméra » pour moveMedia (détacher une image en photo indépendante). */
+  M.NONE = '__none__';
+
   /**
-   * Déplace une vidéo vers une autre caméra (cameraId = null → nouvelle caméra).
-   * Une caméra devenue vide est supprimée (une caméra contient toujours 1..n vidéos).
+   * Rattache un média à une caméra.
+   *  cameraId = id d'une caméra existante | null (nouvelle caméra) | M.NONE (image seulement : photo indépendante).
+   * Une caméra devenue vide est supprimée (une caméra contient toujours 1..n médias). Émet model:rebuilt.
+   * @returns la caméra de destination, ou le média détaché
    */
-  M.moveVideo = function (videoId, cameraId) {
-    const v = M.byId.get(videoId);
-    if (!v || !v.camera) return null;
-    const from = v.camera;
+  M.moveMedia = function (id, cameraId) {
+    const it = M.byId.get(id);
+    if (!it || (it.type !== 'video' && it.type !== 'image')) return null;
+    const from = it.camera || null;
+    const anchor = from || it; // position dans M.roots pour insérer une nouvelle entrée
+
+    if (cameraId === M.NONE) {
+      if (it.type !== 'image' || !from) return from; // une vidéo appartient toujours à une caméra
+      detach(it, from);
+      M.roots.splice(M.roots.indexOf(from) + 1, 0, it);
+      compute(it);
+      if (!from.medias.length) removeRoot(from); else computeCamera(from);
+      RP.bus.emit('model:rebuilt');
+      return it;
+    }
+
     let to;
     if (cameraId) {
       to = M.byId.get(cameraId);
       if (!to || to.type !== 'camera' || to === from) return from;
     } else {
-      to = M.createCamera({ name: v.name, position: v.pos ? { lat: v.pos.lat, lon: v.pos.lon } : undefined, applyPosition: true });
+      to = M.createCamera({ name: it.name, position: it.pos ? { lat: it.pos.lat, lon: it.pos.lon } : undefined, applyPosition: true });
       if (!to.raw.position) delete to.raw.position;
-      // place la nouvelle caméra juste après l'ancienne
       M.roots = M.roots.filter(n => n !== to);
-      M.roots.splice(M.roots.indexOf(from) + 1, 0, to);
+      M.roots.splice(M.roots.indexOf(anchor) + 1, 0, to); // juste après l'ancienne entrée
     }
-    from.videos = from.videos.filter(x => x !== v);
-    v.camera = to;
-    to.videos.push(v);
+    if (from) detach(it, from);
+    else M.roots = M.roots.filter(n => n !== it); // une photo indépendante quitte le premier niveau
+    it.camera = to;
+    to.medias.push(it);
     computeCamera(to);
-    if (!from.videos.length) removeRoot(from); else computeCamera(from);
+    if (from) { if (!from.medias.length) removeRoot(from); else computeCamera(from); }
     RP.bus.emit('model:rebuilt');
     return to;
   };
+  M.moveVideo = M.moveMedia; // compatibilité
+
+  function detach(it, cam) {
+    cam.medias = cam.medias.filter(x => x !== it);
+    it.camera = null;
+  }
 
   M.recomputeAll = function () { M.roots.forEach(recompute); };
 
@@ -275,13 +312,16 @@
   /** Nombre de nœuds de premier niveau incomplets (une caméra compte pour une). */
   M.missingCount = () => M.roots.filter(n => n.missing.length).length;
 
-  /** Sérialisation au format JSON du projet (les caméras embarquent leurs vidéos). */
+  /** Sérialisation au format JSON du projet (les caméras embarquent leurs médias, typés). */
   M.serialize = function () {
-    const clean = raw => { const o = Object.assign({}, raw); return o; };
+    const clean = raw => Object.assign({}, raw);
     return M.roots.map(n => {
       if (n.type !== 'camera') return clean(n.raw);
       const o = clean(n.raw);
-      o.videos = n.videos.map(v => { const x = clean(v.raw); delete x.type; return x; });
+      o.medias = n.medias.map(m => {
+        const x = clean(m.raw);
+        return Object.assign({ type: m.type }, x); // "type" en tête pour la lisibilité
+      });
       return o;
     });
   };
@@ -294,5 +334,5 @@
     return files.find(f => f.path.toLowerCase() === want) || files.find(f => f.name.toLowerCase() === base) || null;
   };
 
-  M.missingLabels = { start: 'date de début', time: 'date', position: 'position', duration: 'durée', track: 'trajectoire', videos: 'vidéos' };
+  M.missingLabels = { start: 'date de début', time: 'date', position: 'position', duration: 'durée', track: 'trajectoire', medias: 'médias' };
 })();

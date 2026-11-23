@@ -8,8 +8,8 @@
   const dismissed = new Set(); // ids de médias/séquences fermés à la main pendant leur intervalle actif
   let dock, floating, zTop = 10;
 
-  /** Une caméra n'a qu'une fenêtre, qui enchaîne ses séquences. */
-  const keyOf = it => (it.camera ? it.camera.id : it.id);
+  /** Une caméra n'a qu'une fenêtre vidéo, qui enchaîne ses séquences ; chaque capture (image) a sa propre fenêtre. */
+  const keyOf = it => (it.camera && it.type === 'video' ? it.camera.id : it.id);
   /** Autre séquence de la même caméra encore active (hors `except`). */
   function otherActive(it, except) {
     if (!it.camera) return null;
@@ -23,7 +23,7 @@
       dismissed.delete(it.id);
       const w = wins.get(keyOf(it));
       if (!w || w.item.id !== it.id) return; // la fenêtre montre déjà une autre séquence
-      const next = otherActive(it, it);
+      const next = it.type === 'video' ? otherActive(it, it) : null;
       if (next) { setContent(w, next); return; }
       if (w.pinned) { w.el.classList.add('pinned-out'); if (w.video) w.video.pause(); }
       else PN.close(keyOf(it));
@@ -95,7 +95,7 @@
     w.forceSync = true;
     w.title.textContent = titleOf(it);
     w.title.title = it.raw.file || it.name;
-    const n = it.camera ? it.camera.videos.length : 0;
+    const n = it.camera ? it.camera.medias.length : 0;
     w.seq.textContent = n > 1 ? 'Séq. ' + it.seq + '/' + n : '';
     w.seq.hidden = n <= 1;
 
@@ -163,7 +163,7 @@
       if (node && node.type === 'camera' ? it.camera === node : it.id === id || keyOf(it) === w.key) {
         w.item = it; w.forceSync = true;
         w.title.textContent = titleOf(it);
-        const n = it.camera ? it.camera.videos.length : 0;
+        const n = it.camera ? it.camera.medias.length : 0;
         w.seq.textContent = n > 1 ? 'Séq. ' + it.seq + '/' + n : ''; w.seq.hidden = n <= 1;
       }
     });

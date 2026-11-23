@@ -69,20 +69,22 @@
   }
 
   function renderCameraRows(cam) {
-    const n = cam.videos.length;
+    const n = cam.medias.length;
     const open = !collapsed.has(cam.id);
     const toggle = n > 1 ? U.el('button', { class: 'tree-toggle', type: 'button', title: open ? 'Replier' : 'Déplier', text: open ? '▾' : '▸', onclick: (e) => {
       e.stopPropagation();
       open ? collapsed.add(cam.id) : collapsed.delete(cam.id);
       E.renderList();
     } }) : U.el('span', { class: 'tree-toggle' });
-    const sub = 'Caméra · ' + n + ' séquence' + (n > 1 ? 's' : '') + ' · ' + (cam.timed ? U.fmtDateTime(cam.tStart) : 'sans date');
+    const ni = cam.images.length, nv = cam.videos.length;
+    const sub = 'Caméra · ' + nv + ' vidéo' + (nv > 1 ? 's' : '') + (ni ? ' + ' + ni + ' capture' + (ni > 1 ? 's' : '') : '') +
+      ' · ' + (cam.timed ? U.fmtDateTime(cam.tStart) : 'sans date');
     list.append(row(cam, 'video camera', cam.name, sub, warnEl(cam), { toggle }));
     if (!open) return;
-    cam.videos.forEach(v => {
-      const vsub = 'Séq. ' + v.seq + ' · ' + (v.timed ? U.fmtTime(v.tStart) : 'sans date') +
-        (v.raw.duration ? ' · ' + U.fmtDuration(v.raw.duration) : '') + (v.raw.file && !v.file ? ' · fichier absent' : '');
-      list.append(row(v, 'video child', U.basename(v.raw.file) || v.name, vsub, warnEl(v)));
+    cam.medias.forEach(v => {
+      const vsub = 'Séq. ' + v.seq + (v.type === 'image' ? ' · capture' : '') + ' · ' + (v.timed ? U.fmtTime(v.tStart) : 'sans date') +
+        (v.type === 'video' && v.raw.duration ? ' · ' + U.fmtDuration(v.raw.duration) : '') + (v.raw.file && !v.file ? ' · fichier absent' : '');
+      list.append(row(v, v.type + ' child', U.basename(v.raw.file) || v.name, vsub, warnEl(v)));
     });
   }
 
@@ -90,7 +92,7 @@
     if (!E.isOpen()) return;
     U.$$('li[data-id]', list).forEach(li => {
       const node = M.get(li.dataset.id);
-      const on = node && node.type === 'camera' ? node.videos.some(v => RP.player.activeIds.has(v.id)) : RP.player.activeIds.has(li.dataset.id);
+      const on = node && node.type === 'camera' ? node.medias.some(v => RP.player.activeIds.has(v.id)) : RP.player.activeIds.has(li.dataset.id);
       li.classList.toggle('active-now', !!on);
     });
   }
@@ -145,7 +147,7 @@
 
   /** Formulaire d'une caméra (conteneur de séquences). */
   function renderCameraForm(cam) {
-    const r = cam.raw, n = cam.videos.length;
+    const r = cam.raw, n = cam.medias.length;
     form.append(
       U.el('h3', {}, [document.createTextNode('Caméra')]),
       U.el('div', { class: 'file', text: n + ' séquence' + (n > 1 ? 's' : '') + (cam.timed ? ' · ' + U.fmtDateTime(cam.tStart) + ' → ' + U.fmtTime(cam.tEnd) : '') })
@@ -158,7 +160,7 @@
     const chk = U.el('input', { type: 'checkbox' });
     chk.checked = cam.applyPosition;
     chk.onchange = () => apply({ applyPosition: chk.checked }, null, cam.id);
-    form.append(U.el('label', { class: 'chk' }, [chk, U.el('span', { text: 'Appliquer cette position à toutes les vidéos' })]));
+    form.append(U.el('label', { class: 'chk' }, [chk, U.el('span', { text: 'Appliquer cette position à toutes les vidéos et captures' })]));
     form.append(U.el('div', { class: 'ed-note', text: cam.applyPosition
       ? 'Toutes les séquences sont placées à la position de la caméra (leurs positions propres sont conservées mais ignorées).'
       : 'Chaque séquence utilise sa position propre ; à défaut, elle hérite de celle de la caméra.' }));
@@ -167,11 +169,11 @@
     // Séquences
     form.append(U.el('div', { class: 'fld' }, [U.el('span', {}, [U.el('b', { text: 'Séquences' })])]));
     const ul = U.el('ul', { class: 'seq-list' });
-    cam.videos.forEach(v => {
+    cam.medias.forEach(v => {
       ul.append(U.el('li', { onclick: () => E.select(v.id) }, [
-        U.el('b', { text: v.seq + '.' }),
+        U.el('b', { text: v.seq + '.' + (v.type === 'image' ? ' 🖼' : '') }),
         U.el('span', { class: 'nm', text: U.basename(v.raw.file) || v.name }),
-        U.el('span', { class: 'sub', text: (v.timed ? U.fmtTime(v.tStart) : 'sans date') + (v.raw.duration ? ' · ' + U.fmtDuration(v.raw.duration) : '') + (v.posFrom === 'video' ? ' · 📍 propre' : '') }),
+        U.el('span', { class: 'sub', text: (v.timed ? U.fmtTime(v.tStart) : 'sans date') + (v.type === 'video' && v.raw.duration ? ' · ' + U.fmtDuration(v.raw.duration) : v.type === 'image' ? ' · capture' : '') + (v.posFrom === 'own' && !cam.applyPosition ? ' · 📍 propre' : '') }),
         warnEl(v)
       ]));
     });
@@ -182,7 +184,7 @@
     form.append(field('notes', 'Notes', notes));
     form.append(U.el('div', { class: 'ed-btns' }, [
       cam.timed ? U.el('button', { class: 'btn sm primary', type: 'button', text: '▶ Aller au début', onclick: () => {
-        RP.player.seek(cam.tStart); RP.panels.reveal(cam.videos.find(v => v.timed).id);
+        RP.player.seek(cam.tStart); RP.panels.reveal(cam.medias.find(v => v.timed).id);
       } }) : null
     ]));
     if (cam.missing.includes('position')) U.$$('.fld[data-k="position"]', form).forEach(x => x.classList.add('miss'));
@@ -199,33 +201,35 @@
     const cam = it.camera;
 
     form.append(
-      U.el('h3', {}, [document.createTextNode(cam ? 'Vidéo — séquence ' + it.seq + '/' + cam.videos.length : (U.typeLabel[it.type] || it.type))]),
+      U.el('h3', {}, [document.createTextNode(cam ? (it.type === 'image' ? 'Capture' : 'Vidéo') + ' — séquence ' + it.seq + '/' + cam.medias.length : (U.typeLabel[it.type] || it.type))]),
       U.el('div', { class: 'file', text: r.file ? r.file + (it.file ? '' : ' — introuvable dans le dossier') : 'Aucun fichier associé' }),
       srcTxt ? U.el('div', { class: 'ed-note', text: 'Sources : ' + srcTxt }) : null
     );
 
     const f = {};
-    if (cam) {
-      // Caméra de rattachement (déplacement possible)
+    if (it.type === 'video' || it.type === 'image') {
+      // Caméra de rattachement (une vidéo appartient toujours à une caméra ; une image peut être indépendante)
       const sel = U.el('select', { class: 'sel-input' });
-      M.cameras().forEach(c => sel.append(U.el('option', { value: c.id, text: c.name + (c.videos.length > 1 ? ' (' + c.videos.length + ' séq.)' : '') })));
+      if (it.type === 'image') sel.append(U.el('option', { value: M.NONE, text: '— Aucune (photo indépendante) —' }));
+      M.cameras().forEach(c => sel.append(U.el('option', { value: c.id, text: c.name + (c.medias.length > 1 ? ' (' + c.medias.length + ' séq.)' : '') })));
       sel.append(U.el('option', { value: '', text: '＋ Nouvelle caméra' }));
-      sel.value = cam.id;
+      sel.value = cam ? cam.id : M.NONE;
       sel.onchange = () => {
-        const to = M.moveVideo(it.id, sel.value || null);
-        if (to) U.toast('Vidéo rattachée à « ' + to.name + ' »');
+        const to = M.moveMedia(it.id, sel.value || null);
+        if (sel.value === M.NONE) U.toast('Photo détachée de sa caméra');
+        else if (to) U.toast((it.type === 'image' ? 'Capture' : 'Vidéo') + ' rattachée à « ' + to.name + ' »');
         E.select(it.id, { noPan: true });
       };
       form.append(field('camera', 'Caméra', sel));
-      form.append(U.el('div', { class: 'ed-btns' }, [U.el('button', { class: 'btn sm', type: 'button', text: '⚙ Ouvrir la caméra', onclick: () => E.select(cam.id) })]));
+      if (cam) form.append(U.el('div', { class: 'ed-btns' }, [U.el('button', { class: 'btn sm', type: 'button', text: '⚙ Ouvrir la caméra', onclick: () => E.select(cam.id) })]));
     }
     f.name = inp({ type: 'text', value: r.name || '', placeholder: cam ? U.basename(r.file) || it.name : it.name });
-    form.append(field('name', cam ? 'Nom de la séquence' : 'Nom', f.name));
+    form.append(field('name', cam ? (it.type === 'image' ? 'Nom de la capture' : 'Nom de la séquence') : 'Nom', f.name));
 
     const timeKey = it.type === 'video' ? 'start' : it.type === 'image' ? 'time' : null;
     if (timeKey) {
       f.time = inp({ type: 'datetime-local', step: '1', value: U.toLocalInput(U.parseTime(r[timeKey])) });
-      form.append(field(timeKey, it.type === 'video' ? 'Début de la vidéo' : 'Date de prise de vue', f.time, U.tzLabel()));
+      form.append(field(timeKey, it.type === 'video' ? 'Début de la vidéo' : cam ? 'Instant de la capture' : 'Date de prise de vue', f.time, U.tzLabel()));
       const btns = U.el('div', { class: 'ed-btns' });
       btns.append(U.el('button', { class: 'btn sm', type: 'button', text: '⟵ Tête de lecture', title: 'Utiliser l\'instant courant de la timeline', onclick: () => {
         if (RP.player.t == null) return;
@@ -258,7 +262,7 @@
     if (cam && cam.applyPosition) {
       positionBlock(it, { disabled: true, shown: cam.pos || {}, tag: 'imposée' }).forEach(x => form.append(x));
       form.append(U.el('div', { class: 'ed-note', text: cam.pos
-        ? 'Position imposée par la caméra « ' + cam.name + ' ». Décochez « Appliquer à toutes les vidéos » dans la caméra pour définir une position propre.'
+        ? 'Position imposée par la caméra « ' + cam.name + ' ». Décochez « Appliquer à toutes les vidéos et captures » dans la caméra pour définir une position propre.'
         : 'Position imposée par la caméra « ' + cam.name + ' », qui n\'en a pas encore : définissez-la dans la caméra.' }));
     } else if (cam) {
       positionBlock(it, { hint: cam.pos, tag: r.position ? 'propre' : cam.pos ? 'héritée' : '' }).forEach(x => form.append(x));

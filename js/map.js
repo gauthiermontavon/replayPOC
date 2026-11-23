@@ -74,7 +74,7 @@
 
   function addCamera(cam) {
     const groups = new Map();
-    cam.videos.forEach(v => {
+    cam.medias.forEach(v => { // vidéos et captures
       if (!v.pos) return;
       const k = v.pos.lat.toFixed(6) + ',' + v.pos.lon.toFixed(6);
       if (!groups.has(k)) groups.set(k, []);
@@ -84,7 +84,7 @@
     groups.forEach((vids, k) => {
       const key = single ? cam.id : cam.id + '@' + k;
       const label = single ? cam.name : cam.name + ' · séq. ' + vids.map(v => v.seq).join(', ');
-      const count = cam.videos.length > 1 ? vids.length : 0;
+      const count = cam.medias.length > 1 ? vids.length : 0;
       const m = { state: '', ids: new Set(vids.map(v => v.id)), node: cam, videos: vids };
       m.marker = L.marker([vids[0].pos.lat, vids[0].pos.lon], { icon: iconFor('video', label, count), title: label, keyboard: false, riseOnHover: true }).addTo(V.map);
       m.marker.on('click', () => RP.bus.emit('item:click', pickVideo(vids).id));
@@ -96,10 +96,11 @@
     });
   }
 
-  /** Séquence pertinente d'un groupe : active, sinon la prochaine, sinon la première. */
+  /** Média pertinent d'un groupe : vidéo active, sinon média actif, sinon le prochain, sinon le premier. */
   function pickVideo(vids) {
     const t = RP.player.t;
-    return vids.find(v => RP.player.activeIds.has(v.id)) ||
+    return vids.find(v => v.type === 'video' && RP.player.activeIds.has(v.id)) ||
+      vids.find(v => RP.player.activeIds.has(v.id)) ||
       vids.filter(v => v.timed && v.tStart >= t).sort((a, b) => a.tStart - b.tStart)[0] || vids[0];
   }
 
@@ -107,7 +108,7 @@
   function dragCameraGroup(cam, vids, pos) {
     const usesCamera = cam.applyPosition || vids.some(v => v.posFrom === 'camera');
     if (usesCamera) M.update(cam.id, { position: pos }, { silent: true });
-    if (!cam.applyPosition) vids.filter(v => v.posFrom === 'video').forEach(v => M.update(v.id, { position: pos }, { silent: true }));
+    if (!cam.applyPosition) vids.filter(v => v.posFrom === 'own').forEach(v => M.update(v.id, { position: pos }, { silent: true }));
     RP.bus.emit('model:changed', { id: cam.id, item: cam });
   }
 

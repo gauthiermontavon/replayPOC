@@ -42,21 +42,32 @@ Tableau d'objets ; champs optionnels ajoutés par l'application en *italique* :
     "track": [ { "time": "2026-08-24T14:30:00Z", "lat": 47.123, "lon": 7.456 } ] },
   { "id": "camera-01", "type": "camera", "name": "Caméra 01",
     "position": { "lat": 47.123, "lon": 7.456 }, "applyPosition": true,
-    "videos": [
-      { "id": "camera-01-1", "file": "camera-01.mp4", "start": "2026-08-24T14:30:00Z", "duration": 90, "offset": 0 },
-      { "id": "camera-01-2", "file": "camera-01/seq2.mp4", "start": "2026-08-24T14:33:00Z", "duration": 45,
+    "medias": [
+      { "type": "video", "id": "camera-01-1", "file": "camera-01.mp4", "start": "2026-08-24T14:30:00Z", "duration": 90, "offset": 0 },
+      { "type": "image", "id": "camera-01-c1", "file": "camera-01/capture-143045.jpg", "time": "2026-08-24T14:30:45Z", "display": 8 },
+      { "type": "video", "id": "camera-01-2", "file": "camera-01/seq2.mp4", "start": "2026-08-24T14:33:00Z", "duration": 45,
         "position": { "lat": 47.124, "lon": 7.457 } } ] },
   { "id": "photo-17", "type": "image", "time": "2026-08-24T14:32:14Z",
     "position": { "lat": 47.125, "lon": 7.461 }, "file": "photo-17.jpg", "display": 10 }
 ]
 ```
-- **Caméra** = conteneur de 1 à n vidéos (séquences d'une même caméra). Une seule fenêtre, une ligne de timeline et un repère
-  par caméra ; la fenêtre enchaîne les séquences.
-  - `applyPosition: true` : toutes les vidéos sont placées à la `position` de la caméra (leurs positions propres sont conservées mais ignorées).
-  - `applyPosition: false` : chaque vidéo utilise sa `position` propre, à défaut celle de la caméra (un repère par position distincte).
-  - Vidéos non référencées : un **sous-dossier = une caméra** (ex. `medias/camera-03/*.mp4`), une vidéo à la racine = sa propre caméra.
-    Une vidéo se déplace vers une autre caméra depuis l'éditeur ; une caméra vidée est supprimée.
-  - L'ancien format (`"type": "video"` au premier niveau) est converti automatiquement en caméra à une séquence.
+- **Caméra** = conteneur de 1 à n médias, listés dans `medias` :
+  - les **vidéos** (`"type": "video"`) sont des séquences de la caméra ;
+  - les **images** (`"type": "image"`) sont des captures d'écran de ses vidéos, traitées comme des séquences : numérotées avec les vidéos et soumises à la même règle de position.
+
+  Affichage :
+  - une ligne de timeline et un repère par caméra ;
+  - une seule fenêtre pour les vidéos, qui enchaîne les séquences ;
+  - chaque capture s'ouvre dans sa propre fenêtre, titrée au nom de la caméra, pendant `display` secondes.
+
+  Position :
+  - `applyPosition: true` : tous les médias sont placés à la `position` de la caméra (leurs positions propres sont conservées mais ignorées) ;
+  - `applyPosition: false` : chaque média utilise sa `position` propre, à défaut celle de la caméra (un repère par position distincte).
+
+  Rangement :
+  - Médias non référencés : un **sous-dossier = une caméra** (ex. `medias/camera-03/*.mp4` et `*.jpg`). Une vidéo à la racine forme sa propre caméra ; une image à la racine reste une photo indépendante.
+  - Depuis l'éditeur, on change la caméra d'un média, et on rattache ou détache une photo. Une caméra vidée est supprimée.
+  - Anciens formats convertis automatiquement : `"videos": [...]` devient `"medias"`, et `"type": "video"` au premier niveau devient une caméra à une séquence.
 - *`duration`* (s) : durée vidéo, lue dans le fichier ; *`display`* (s) : durée d'affichage d'une photo (10 par défaut) ;
 - *`offset`* (s) : correction d'horloge de l'appareil ; *`notes`* ; *`meta.source`* : origine de chaque valeur (exif, mp4, manuel…).
 

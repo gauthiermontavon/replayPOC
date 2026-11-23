@@ -128,7 +128,8 @@
       try {
         const raw = await MD.extract(f);
         if (!raw) continue;
-        if (raw.type === 'video') addVideoToFolderCamera(raw, f);
+        // Vidéos : toujours dans une caméra ; images : dans la caméra de leur sous-dossier, sinon photo indépendante
+        if (raw.type === 'video' || (raw.type === 'image' && f.path.includes('/'))) addToFolderCamera(raw, f);
         else M.add(raw, () => f.file);
         changed = true;
       } catch (e) { console.warn('Extraction', f.name, e); }
@@ -161,9 +162,9 @@
 
   A.loadFolder = loadFolder;
 
-  /* Regroupement automatique : un sous-dossier = une caméra ; une vidéo à la racine = sa propre caméra. */
+  /* Regroupement automatique : un sous-dossier = une caméra (vidéos et captures) ; une vidéo à la racine = sa propre caméra. */
   const autoCams = new Set();
-  function addVideoToFolderCamera(vraw, f) {
+  function addToFolderCamera(vraw, f) {
     const dir = f.path.includes('/') ? f.path.split('/').slice(0, -1).join('/') : '';
     let cam = null;
     if (dir) {
@@ -176,14 +177,14 @@
       autoCams.add(cam);
     }
     delete vraw.name; // le nom affiché est celui de la caméra ; la séquence garde son fichier
-    vraw.id = cam.id + '-' + (cam.videos.length + 1);
-    M.addVideoToCamera(cam, vraw, f.file);
+    vraw.id = cam.id + '-' + (vraw.type === 'image' ? 'c' : '') + (cam.medias.length + 1);
+    M.addMediaToCamera(cam, vraw, f.file);
   }
 
-  /** Caméras créées automatiquement : position = 1re position GPS trouvée ; appliquée à toutes si aucune vidéo n'a la sienne. */
+  /** Caméras créées automatiquement : position = 1re position GPS trouvée ; appliquée à tous les médias s'ils sont tous au même endroit. */
   function finalizeAutoCameras() {
     autoCams.forEach(cam => {
-      const withPos = cam.videos.filter(v => v.ownPos);
+      const withPos = cam.medias.filter(v => v.ownPos);
       if (!cam.raw.position && withPos.length) cam.raw.position = { lat: withPos[0].ownPos.lat, lon: withPos[0].ownPos.lon };
       const distinct = new Set(withPos.map(v => v.ownPos.lat.toFixed(6) + ',' + v.ownPos.lon.toFixed(6)));
       cam.raw.applyPosition = distinct.size <= 1;

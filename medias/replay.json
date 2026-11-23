@@ -170,8 +170,9 @@
       "lon": 7.456
     },
     "applyPosition": true,
-    "videos": [
+    "medias": [
       {
+        "type": "video",
         "id": "camera-01-1",
         "start": "2026-08-24T14:30:00Z",
         "file": "camera-01.mp4",
@@ -183,6 +184,15 @@
         }
       },
       {
+        "type": "image",
+        "id": "camera-01-c1",
+        "name": "Capture 14:30:45",
+        "file": "camera-01/capture-143045.jpg",
+        "time": "2026-08-24T14:30:45Z",
+        "display": 8
+      },
+      {
+        "type": "video",
         "id": "camera-01-2",
         "file": "camera-01/seq2.mp4",
         "start": "2026-08-24T14:33:00Z",
@@ -221,8 +231,9 @@
       "lon": 7.463
     },
     "applyPosition": true,
-    "videos": [
+    "medias": [
       {
+        "type": "video",
         "id": "camera-02-1",
         "file": "camera-02.mov",
         "duration": 60,
